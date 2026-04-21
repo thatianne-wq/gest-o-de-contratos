@@ -6,6 +6,10 @@
       "type": "string",
       "description": "ID do contrato relacionado"
     },
+    "additive_id": {
+      "type": "string",
+      "description": "ID do aditivo relacionado (opcional, se medindo um aditivo)"
+    },
     "type": {
       "type": "string",
       "enum": [

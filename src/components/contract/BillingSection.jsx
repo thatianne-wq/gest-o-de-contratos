@@ -28,16 +28,18 @@ const typeConfig = {
   fd: { label: "FD", className: "bg-purple-100 text-purple-700 border-purple-200" },
 };
 
-export default function BillingSection({ contractId, billings }) {
+const emptyForm = { description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false, origin: "contract", additive_id: "" };
+
+export default function BillingSection({ contractId, billings, additives = [] }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false });
+  const [form, setForm] = useState(emptyForm);
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Billing.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billings"] });
-      setForm({ description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false });
+      setForm(emptyForm);
       setOpen(false);
     },
   });
@@ -51,6 +53,7 @@ export default function BillingSection({ contractId, billings }) {
     e.preventDefault();
     createMutation.mutate({
       contract_id: contractId,
+      additive_id: form.origin === "additive" ? form.additive_id : null,
       type: form.type,
       is_sinal: form.is_sinal,
       description: form.description,
@@ -64,7 +67,6 @@ export default function BillingSection({ contractId, billings }) {
   const totalFD = billings.filter((b) => b.type === "fd").reduce((s, b) => s + (b.value || 0), 0);
   const total = billings.reduce((s, b) => s + (b.value || 0), 0);
 
-  // Group by month
   const byMonth = billings.reduce((acc, b) => {
     const key = b.month || "Sem mês";
     if (!acc[key]) acc[key] = [];
@@ -73,6 +75,12 @@ export default function BillingSection({ contractId, billings }) {
   }, {});
 
   const sortedMonths = Object.keys(byMonth).sort().reverse();
+
+  const getAdditiveName = (additiveId) => {
+    const a = additives.find((ad) => ad.id === additiveId);
+    if (!a) return "Aditivo";
+    return a.description || `Aditivo #${additives.indexOf(a) + 1}`;
+  };
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm">
@@ -105,6 +113,49 @@ export default function BillingSection({ contractId, billings }) {
               <DialogTitle>Novo Faturamento</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+
+              {/* Origem: Contrato ou Aditivo */}
+              <div className="space-y-2">
+                <Label>Origem *</Label>
+                <Select
+                  value={form.origin}
+                  onValueChange={(v) => setForm({ ...form, origin: v, additive_id: "" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contract">Contrato Base</SelectItem>
+                    <SelectItem value="additive" disabled={additives.length === 0}>
+                      Aditivo {additives.length === 0 ? "(nenhum cadastrado)" : ""}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Se aditivo, selecionar qual */}
+              {form.origin === "additive" && (
+                <div className="space-y-2">
+                  <Label>Aditivo *</Label>
+                  <Select
+                    value={form.additive_id}
+                    onValueChange={(v) => setForm({ ...form, additive_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o aditivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {additives.map((a, i) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.description || `Aditivo #${i + 1}`}
+                          {(a.value_empresa || a.value_fd) ? ` — ${formatCurrency((a.value_empresa || 0) + (a.value_fd || 0))}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Tipo *</Label>
                 <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
@@ -117,6 +168,7 @@ export default function BillingSection({ contractId, billings }) {
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
                 <Label>Descrição</Label>
                 <Input
@@ -167,7 +219,10 @@ export default function BillingSection({ contractId, billings }) {
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending || (form.origin === "additive" && !form.additive_id)}
+                >
                   {createMutation.isPending ? "Salvando..." : "Adicionar"}
                 </Button>
               </div>
@@ -194,13 +249,18 @@ export default function BillingSection({ contractId, billings }) {
                   const tc = typeConfig[billing.type || "medicao"];
                   return (
                     <div key={billing.id} className="flex items-center justify-between px-6 py-3">
-                      <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-start gap-3 flex-wrap">
                         <Badge variant="outline" className={`text-xs ${tc.className}`}>
                           {tc.label}
                         </Badge>
                         {billing.is_sinal && (
                           <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-200">
                             Sinal
+                          </Badge>
+                        )}
+                        {billing.additive_id && (
+                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-200">
+                            {getAdditiveName(billing.additive_id)}
                           </Badge>
                         )}
                         <p className="text-sm text-foreground">
