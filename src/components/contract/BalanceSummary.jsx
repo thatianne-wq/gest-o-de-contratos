@@ -1,10 +1,13 @@
 import { formatCurrency } from "@/lib/formatCurrency";
 import { motion } from "framer-motion";
 
-export default function BalanceSummary({ initialValue, totalAdditives, totalBilled }) {
+export default function BalanceSummary({ initialValue, totalAdditives, totalBilled, billings = [] }) {
   const totalContract = initialValue + totalAdditives;
   const balance = totalContract - totalBilled;
   const percentage = totalContract > 0 ? (totalBilled / totalContract) * 100 : 0;
+
+  const totalMedicao = billings.filter((b) => (b.type || "medicao") === "medicao").reduce((s, b) => s + (b.value || 0), 0);
+  const totalFD = billings.filter((b) => b.type === "fd").reduce((s, b) => s + (b.value || 0), 0);
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm p-6">
@@ -24,7 +27,15 @@ export default function BalanceSummary({ initialValue, totalAdditives, totalBill
           <span className="text-sm font-bold">{formatCurrency(totalContract)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground">Faturado</span>
+          <span className="text-sm text-muted-foreground">Faturado Medição</span>
+          <span className="text-sm font-semibold text-blue-600">{formatCurrency(totalMedicao)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Faturado FD</span>
+          <span className="text-sm font-semibold text-purple-600">{formatCurrency(totalFD)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">Total Faturado</span>
           <span className="text-sm font-semibold text-primary">{formatCurrency(totalBilled)}</span>
         </div>
 

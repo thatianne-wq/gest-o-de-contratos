@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency, formatMonth } from "@/lib/formatCurrency";
 import {
@@ -13,17 +14,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const typeConfig = {
+  medicao: { label: "Medição", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  fd: { label: "FD", className: "bg-purple-100 text-purple-700 border-purple-200" },
+};
 
 export default function BillingSection({ contractId, billings }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ description: "", value: "", month: "", date: "" });
+  const [form, setForm] = useState({ description: "", value: "", month: "", date: "", type: "medicao" });
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Billing.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billings"] });
-      setForm({ description: "", value: "", month: "", date: "" });
+      setForm({ description: "", value: "", month: "", date: "", type: "medicao" });
       setOpen(false);
     },
   });
@@ -37,6 +50,7 @@ export default function BillingSection({ contractId, billings }) {
     e.preventDefault();
     createMutation.mutate({
       contract_id: contractId,
+      type: form.type,
       description: form.description,
       value: parseFloat(form.value) || 0,
       month: form.month,
@@ -44,6 +58,8 @@ export default function BillingSection({ contractId, billings }) {
     });
   };
 
+  const totalMedicao = billings.filter((b) => (b.type || "medicao") === "medicao").reduce((s, b) => s + (b.value || 0), 0);
+  const totalFD = billings.filter((b) => b.type === "fd").reduce((s, b) => s + (b.value || 0), 0);
   const total = billings.reduce((s, b) => s + (b.value || 0), 0);
 
   // Group by month
@@ -61,9 +77,19 @@ export default function BillingSection({ contractId, billings }) {
       <div className="flex items-center justify-between p-6 border-b border-border">
         <div>
           <h3 className="font-semibold text-foreground">Faturamento</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            {billings.length} lançamento(s) · Total: {formatCurrency(total)}
-          </p>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
+            </p>
+            <span className="text-xs text-muted-foreground">·</span>
+            <p className="text-xs text-muted-foreground">
+              Medição: <span className="font-semibold text-blue-600">{formatCurrency(totalMedicao)}</span>
+            </p>
+            <span className="text-xs text-muted-foreground">·</span>
+            <p className="text-xs text-muted-foreground">
+              FD: <span className="font-semibold text-purple-600">{formatCurrency(totalFD)}</span>
+            </p>
+          </div>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -77,6 +103,18 @@ export default function BillingSection({ contractId, billings }) {
               <DialogTitle>Novo Faturamento</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tipo *</Label>
+                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="medicao">Medição</SelectItem>
+                    <SelectItem value="fd">FD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Descrição</Label>
                 <Input
@@ -142,22 +180,30 @@ export default function BillingSection({ contractId, billings }) {
                 </span>
               </div>
               <div className="divide-y divide-border">
-                {byMonth[month].map((billing) => (
-                  <div key={billing.id} className="flex items-center justify-between px-6 py-3">
-                    <p className="text-sm text-foreground">
-                      {billing.description || "Faturamento"}
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-semibold">{formatCurrency(billing.value)}</span>
-                      <button
-                        onClick={() => deleteMutation.mutate(billing.id)}
-                        className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                {byMonth[month].map((billing) => {
+                  const tc = typeConfig[billing.type || "medicao"];
+                  return (
+                    <div key={billing.id} className="flex items-center justify-between px-6 py-3">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className={`text-xs ${tc.className}`}>
+                          {tc.label}
+                        </Badge>
+                        <p className="text-sm text-foreground">
+                          {billing.description || "Faturamento"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-semibold">{formatCurrency(billing.value)}</span>
+                        <button
+                          onClick={() => deleteMutation.mutate(billing.id)}
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

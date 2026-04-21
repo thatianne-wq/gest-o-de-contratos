@@ -164,6 +164,7 @@ export default function ContractDetail() {
             initialValue={contract.initial_value || 0}
             totalAdditives={totalAdditives}
             totalBilled={totalBilled}
+            billings={billings}
           />
         </div>
       </div>

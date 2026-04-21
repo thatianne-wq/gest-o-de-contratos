@@ -6,6 +6,15 @@
       "type": "string",
       "description": "ID do contrato relacionado"
     },
+    "type": {
+      "type": "string",
+      "enum": [
+        "medicao",
+        "fd"
+      ],
+      "default": "medicao",
+      "description": "Tipo de faturamento: Medi\u00e7\u00e3o ou FD"
+    },
     "description": {
       "type": "string",
       "description": "Descri\u00e7\u00e3o do faturamento"
