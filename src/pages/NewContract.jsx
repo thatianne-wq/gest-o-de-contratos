@@ -15,7 +15,8 @@ export default function NewContract() {
   const [form, setForm] = useState({
     project: "",
     client: "",
-    initial_value: "",
+    initial_value_empresa: "",
+    initial_value_fd: "",
     start_date: "",
     notes: "",
   });
@@ -32,7 +33,8 @@ export default function NewContract() {
     e.preventDefault();
     mutation.mutate({
       ...form,
-      initial_value: parseFloat(form.initial_value) || 0,
+      initial_value_empresa: parseFloat(form.initial_value_empresa) || 0,
+      initial_value_fd: parseFloat(form.initial_value_fd) || 0,
       status: "active",
     });
   };
@@ -69,19 +71,6 @@ export default function NewContract() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="initial_value">Valor do Contrato Inicial *</Label>
-              <Input
-                id="initial_value"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.initial_value}
-                onChange={(e) => setForm({ ...form, initial_value: e.target.value })}
-                placeholder="0,00"
-                required
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="start_date">Data de Início</Label>
               <Input
                 id="start_date"
@@ -91,6 +80,37 @@ export default function NewContract() {
               />
             </div>
           </div>
+
+          <div className="border border-border rounded-lg p-4 space-y-4">
+            <p className="text-sm font-semibold text-foreground">Contrato Inicial</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="initial_value_empresa">Valor Empresa (R$)</Label>
+                <Input
+                  id="initial_value_empresa"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.initial_value_empresa}
+                  onChange={(e) => setForm({ ...form, initial_value_empresa: e.target.value })}
+                  placeholder="0,00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="initial_value_fd">Valor FD (R$)</Label>
+                <Input
+                  id="initial_value_fd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.initial_value_fd}
+                  onChange={(e) => setForm({ ...form, initial_value_fd: e.target.value })}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="notes">Observações</Label>
             <Textarea

@@ -10,18 +10,22 @@ const statusMap = {
   cancelled: { label: "Cancelado", className: "bg-red-100 text-red-700 border-red-200" },
 };
 
-export default function ContractTable({ contracts, additives, billings }) {
-  const getContractTotals = (contractId, initialValue) => {
-    const totalAdditives = additives
-      .filter((a) => a.contract_id === contractId)
-      .reduce((sum, a) => sum + (a.value || 0), 0);
-    const totalBilled = billings
-      .filter((b) => b.contract_id === contractId)
-      .reduce((sum, b) => sum + (b.value || 0), 0);
-    const balance = initialValue + totalAdditives - totalBilled;
-    return { totalAdditives, totalBilled, balance };
-  };
+function getContractTotals(contract, contractAdditives, contractBillings) {
+  const initialEmpresa = contract.initial_value_empresa ?? contract.initial_value ?? 0;
+  const initialFD = contract.initial_value_fd || 0;
+  const initialTotal = initialEmpresa + initialFD;
 
+  const additivesEmpresa = contractAdditives.reduce((s, a) => s + (a.value_empresa || 0), 0);
+  const additivesFD = contractAdditives.reduce((s, a) => s + (a.value_fd || 0), 0);
+  const additivesTotal = additivesEmpresa + additivesFD;
+
+  const totalBilled = contractBillings.reduce((s, b) => s + (b.value || 0), 0);
+  const balance = initialTotal + additivesTotal - totalBilled;
+
+  return { initialTotal, additivesTotal, totalBilled, balance };
+}
+
+export default function ContractTable({ contracts, additives, billings }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
@@ -30,7 +34,7 @@ export default function ContractTable({ contracts, additives, billings }) {
             <tr className="border-b border-border bg-muted/50">
               <th className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Projeto</th>
               <th className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Cliente</th>
-              <th className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Contrato</th>
+              <th className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Contrato Inicial</th>
               <th className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Aditivos</th>
               <th className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Faturado</th>
               <th className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground px-6 py-4">Saldo</th>
@@ -40,7 +44,9 @@ export default function ContractTable({ contracts, additives, billings }) {
           </thead>
           <tbody>
             {contracts.map((contract, index) => {
-              const { totalAdditives, totalBilled, balance } = getContractTotals(contract.id, contract.initial_value || 0);
+              const contractAdditives = additives.filter((a) => a.contract_id === contract.id);
+              const contractBillings = billings.filter((b) => b.contract_id === contract.id);
+              const { initialTotal, additivesTotal, totalBilled, balance } = getContractTotals(contract, contractAdditives, contractBillings);
               const status = statusMap[contract.status] || statusMap.active;
               return (
                 <motion.tr
@@ -54,8 +60,8 @@ export default function ContractTable({ contracts, additives, billings }) {
                     <span className="font-semibold text-sm text-foreground">{contract.project}</span>
                   </td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{contract.client}</td>
-                  <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(contract.initial_value)}</td>
-                  <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(totalAdditives)}</td>
+                  <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(initialTotal)}</td>
+                  <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(additivesTotal)}</td>
                   <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(totalBilled)}</td>
                   <td className={`px-6 py-4 text-sm text-right font-bold ${balance < 0 ? "text-destructive" : "text-emerald-600"}`}>
                     {formatCurrency(balance)}

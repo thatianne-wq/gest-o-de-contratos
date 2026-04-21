@@ -88,8 +88,6 @@ export default function ContractDetail() {
     );
   }
 
-  const totalAdditives = additives.reduce((s, a) => s + (a.value || 0), 0);
-  const totalBilled = billings.reduce((s, b) => s + (b.value || 0), 0);
   const status = statusMap[contract.status] || statusMap.active;
 
   return (
@@ -161,9 +159,8 @@ export default function ContractDetail() {
         </div>
         <div>
           <BalanceSummary
-            initialValue={contract.initial_value || 0}
-            totalAdditives={totalAdditives}
-            totalBilled={totalBilled}
+            contract={contract}
+            additives={additives}
             billings={billings}
           />
         </div>

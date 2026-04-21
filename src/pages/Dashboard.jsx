@@ -27,10 +27,10 @@ export default function Dashboard() {
   const isLoading = loadingContracts || loadingAdditives || loadingBillings;
 
   const activeContracts = contracts.filter((c) => c.status === "active");
-  const totalInitial = activeContracts.reduce((s, c) => s + (c.initial_value || 0), 0);
+  const totalInitial = activeContracts.reduce((s, c) => s + (c.initial_value_empresa || c.initial_value || 0) + (c.initial_value_fd || 0), 0);
   const totalAdditives = additives
     .filter((a) => activeContracts.some((c) => c.id === a.contract_id))
-    .reduce((s, a) => s + (a.value || 0), 0);
+    .reduce((s, a) => s + (a.value_empresa || 0) + (a.value_fd || 0), 0);
   const totalBilled = billings
     .filter((b) => activeContracts.some((c) => c.id === b.contract_id))
     .reduce((s, b) => s + (b.value || 0), 0);

@@ -10,9 +10,13 @@
       "type": "string",
       "description": "Nome do cliente"
     },
-    "initial_value": {
+    "initial_value_empresa": {
       "type": "number",
-      "description": "Valor do contrato inicial"
+      "description": "Valor do contrato inicial - Empresa"
+    },
+    "initial_value_fd": {
+      "type": "number",
+      "description": "Valor do contrato inicial - FD"
     },
     "status": {
       "type": "string",
@@ -36,7 +40,6 @@
   },
   "required": [
     "project",
-    "client",
-    "initial_value"
+    "client"
   ]
 }
