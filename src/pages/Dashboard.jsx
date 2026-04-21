@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { exportBacklogToExcel } from "@/lib/exportToExcel";
+import { useAccessFilter } from "@/hooks/useAccessFilter";
 import {
   Select,
   SelectContent,
@@ -35,12 +36,14 @@ export default function Dashboard() {
     queryFn: () => base44.entities.Billing.list(),
   });
 
+  const { allowedContracts } = useAccessFilter(contracts);
+
   const isLoading = loadingContracts || loadingAdditives || loadingBillings;
 
-  // Filtro por projeto
+  // Filtro por projeto (aplicado sobre contratos permitidos)
   const filteredContracts = filterProject
-    ? contracts.filter((c) => c.id === filterProject)
-    : contracts;
+    ? allowedContracts.filter((c) => c.id === filterProject)
+    : allowedContracts;
 
   const filteredAdditives = additives.filter((a) =>
     filteredContracts.some((c) => c.id === a.contract_id)
@@ -96,7 +99,7 @@ export default function Dashboard() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={null}>Todos os projetos</SelectItem>
-              {contracts.map((c) => (
+              {allowedContracts.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.project}
                 </SelectItem>
@@ -143,7 +146,7 @@ export default function Dashboard() {
 
       <DashboardCharts
         billings={billings}
-        allContracts={contracts}
+        allContracts={allowedContracts}
         filterProject={filterProject}
         onFilterProject={setFilterProject}
       />

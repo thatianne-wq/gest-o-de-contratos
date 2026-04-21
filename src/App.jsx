@@ -12,6 +12,7 @@ import Contracts from './pages/Contracts';
 import NewContract from './pages/NewContract';
 import ContractDetail from './pages/ContractDetail';
 import EditContract from './pages/EditContract';
+import UserManagement from './pages/UserManagement';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -41,6 +42,7 @@ const AuthenticatedApp = () => {
         <Route path="/contracts/new" element={<NewContract />} />
         <Route path="/contracts/:id" element={<ContractDetail />} />
         <Route path="/contracts/:id/edit" element={<EditContract />} />
+        <Route path="/users" element={<UserManagement />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

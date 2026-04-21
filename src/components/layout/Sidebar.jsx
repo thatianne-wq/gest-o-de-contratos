@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, FileText, Plus, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, Plus, LogOut, Users } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 
 const navItems = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -10,6 +11,11 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
+  const isAdmin = user?.role === "admin";
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-64 bg-sidebar text-sidebar-foreground flex flex-col z-50">
@@ -38,7 +44,20 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-1">
+        {isAdmin && (
+          <Link
+            to="/users"
+            className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+              location.pathname === "/users"
+                ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Usuários
+          </Link>
+        )}
         <button
           onClick={() => base44.auth.logout()}
           className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200 w-full"

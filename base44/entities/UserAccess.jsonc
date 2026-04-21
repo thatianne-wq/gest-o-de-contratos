@@ -1,0 +1,25 @@
+{
+  "name": "UserAccess",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email do usu\u00e1rio"
+    },
+    "allowed_contract_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs dos contratos que o usu\u00e1rio pode visualizar (vazio = nenhum acesso)"
+    },
+    "is_admin": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se verdadeiro, tem acesso total a todos os contratos"
+    }
+  },
+  "required": [
+    "user_email"
+  ]
+}
