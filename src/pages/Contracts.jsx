@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { exportBacklogToExcel } from "@/lib/exportToExcel";
 import { Input } from "@/components/ui/input";
 import ContractTable from "../components/dashboard/ContractTable";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,12 +51,22 @@ export default function Contracts() {
             {contracts.length} contratos cadastrados
           </p>
         </div>
-        <Link to="/contracts/new">
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Novo Contrato
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => exportBacklogToExcel(contracts, additives, billings)}
+          >
+            <Download className="w-4 h-4" />
+            Exportar Excel
           </Button>
-        </Link>
+          <Link to="/contracts/new">
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Novo Contrato
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="relative max-w-sm">

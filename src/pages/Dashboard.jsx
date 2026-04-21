@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { FileText, TrendingUp, Receipt, Wallet } from "lucide-react";
+import { FileText, TrendingUp, Receipt, Wallet, Download } from "lucide-react";
 import StatsCard from "../components/dashboard/StatsCard";
 import ContractTable from "../components/dashboard/ContractTable";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { exportBacklogToExcel } from "@/lib/exportToExcel";
 
 export default function Dashboard() {
   const { data: contracts = [], isLoading: loadingContracts } = useQuery({
@@ -53,11 +55,21 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 pb-20 md:pb-0">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Visão geral do backlog de contratos
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Visão geral do backlog de contratos
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2 self-start"
+          onClick={() => exportBacklogToExcel(contracts, additives, billings)}
+        >
+          <Download className="w-4 h-4" />
+          Exportar Excel
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
