@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
@@ -34,6 +35,7 @@ export default function ContractDetail() {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [filterMonth, setFilterMonth] = useState("");
 
   const { data: contracts = [], isLoading: loadingContract } = useQuery({
     queryKey: ["contracts"],
@@ -155,13 +157,14 @@ export default function ContractDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <AdditiveSection contractId={contractId} additives={additives} />
-          <BillingSection contractId={contractId} billings={billings} additives={additives} />
+          <BillingSection contractId={contractId} billings={billings} additives={additives} filterMonth={filterMonth} onFilterMonthChange={setFilterMonth} />
         </div>
         <div>
           <BalanceSummary
             contract={contract}
             additives={additives}
-            billings={billings}
+            billings={filterMonth ? billings.filter((b) => b.month === filterMonth) : billings}
+            filterMonth={filterMonth}
           />
         </div>
       </div>

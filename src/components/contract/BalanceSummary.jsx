@@ -1,7 +1,7 @@
-import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCurrency, formatMonth } from "@/lib/formatCurrency";
 import { motion } from "framer-motion";
 
-export default function BalanceSummary({ contract, additives = [], billings = [] }) {
+export default function BalanceSummary({ contract, additives = [], billings = [], filterMonth = "" }) {
   const initialEmpresa = contract.initial_value_empresa || contract.initial_value || 0;
   const initialFD = contract.initial_value_fd || 0;
   const initialTotal = initialEmpresa + initialFD;
@@ -23,7 +23,14 @@ export default function BalanceSummary({ contract, additives = [], billings = []
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-      <h3 className="font-semibold text-foreground mb-4">Resumo Financeiro</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-foreground">Resumo Financeiro</h3>
+        {filterMonth && (
+          <span className="text-xs bg-primary/10 text-primary font-medium px-2 py-0.5 rounded-full">
+            {formatMonth(filterMonth)}
+          </span>
+        )}
+      </div>
 
       <div className="space-y-3">
         {/* Contrato inicial */}

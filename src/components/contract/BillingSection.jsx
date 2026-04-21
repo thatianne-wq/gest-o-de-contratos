@@ -30,11 +30,10 @@ const typeConfig = {
 
 const emptyForm = { description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false, origin: "contract", additive_id: "" };
 
-export default function BillingSection({ contractId, billings, additives = [] }) {
+export default function BillingSection({ contractId, billings, additives = [], filterMonth = "", onFilterMonthChange }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [filterMonth, setFilterMonth] = useState("");
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Billing.create(data),
@@ -77,6 +76,7 @@ export default function BillingSection({ contractId, billings, additives = [] })
 
   const allMonths = Object.keys(byMonth).sort().reverse();
   const sortedMonths = filterMonth ? allMonths.filter((m) => m === filterMonth) : allMonths;
+  const setFilterMonth = onFilterMonthChange;
 
   const getAdditiveName = (additiveId) => {
     const a = additives.find((ad) => ad.id === additiveId);
