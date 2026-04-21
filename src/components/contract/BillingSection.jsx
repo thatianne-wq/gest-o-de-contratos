@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Filter } from "lucide-react";
 import { formatCurrency, formatMonth } from "@/lib/formatCurrency";
 import {
   Dialog,
@@ -34,6 +34,7 @@ export default function BillingSection({ contractId, billings, additives = [] })
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [filterMonth, setFilterMonth] = useState("");
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Billing.create(data),
@@ -74,7 +75,8 @@ export default function BillingSection({ contractId, billings, additives = [] })
     return acc;
   }, {});
 
-  const sortedMonths = Object.keys(byMonth).sort().reverse();
+  const allMonths = Object.keys(byMonth).sort().reverse();
+  const sortedMonths = filterMonth ? allMonths.filter((m) => m === filterMonth) : allMonths;
 
   const getAdditiveName = (additiveId) => {
     const a = additives.find((ad) => ad.id === additiveId);
@@ -101,7 +103,22 @@ export default function BillingSection({ contractId, billings, additives = [] })
             </p>
           </div>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <div className="flex items-center gap-2">
+          {Object.keys(byMonth).length > 0 && (
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="h-8 w-40 text-xs">
+                <Filter className="w-3 h-3 mr-1 text-muted-foreground" />
+                <SelectValue placeholder="Todos os meses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={null}>Todos os meses</SelectItem>
+                {allMonths.map((m) => (
+                  <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-2">
               <Plus className="w-3.5 h-3.5" />
@@ -229,6 +246,7 @@ export default function BillingSection({ contractId, billings, additives = [] })
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div>
