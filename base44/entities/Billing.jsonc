@@ -15,6 +15,11 @@
       "default": "medicao",
       "description": "Tipo de faturamento: Medi\u00e7\u00e3o ou FD"
     },
+    "is_sinal": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica se o faturamento \u00e9 um sinal"
+    },
     "description": {
       "type": "string",
       "description": "Descri\u00e7\u00e3o do faturamento"

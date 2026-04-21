@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const typeConfig = {
   medicao: { label: "Medição", className: "bg-blue-100 text-blue-700 border-blue-200" },
@@ -30,13 +31,13 @@ const typeConfig = {
 export default function BillingSection({ contractId, billings }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ description: "", value: "", month: "", date: "", type: "medicao" });
+  const [form, setForm] = useState({ description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false });
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Billing.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["billings"] });
-      setForm({ description: "", value: "", month: "", date: "", type: "medicao" });
+      setForm({ description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false });
       setOpen(false);
     },
   });
@@ -51,6 +52,7 @@ export default function BillingSection({ contractId, billings }) {
     createMutation.mutate({
       contract_id: contractId,
       type: form.type,
+      is_sinal: form.is_sinal,
       description: form.description,
       value: parseFloat(form.value) || 0,
       month: form.month,
@@ -153,6 +155,14 @@ export default function BillingSection({ contractId, billings }) {
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="is_sinal"
+                  checked={form.is_sinal}
+                  onCheckedChange={(checked) => setForm({ ...form, is_sinal: !!checked })}
+                />
+                <Label htmlFor="is_sinal" className="cursor-pointer">É Sinal?</Label>
+              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
@@ -184,10 +194,15 @@ export default function BillingSection({ contractId, billings }) {
                   const tc = typeConfig[billing.type || "medicao"];
                   return (
                     <div key={billing.id} className="flex items-center justify-between px-6 py-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <Badge variant="outline" className={`text-xs ${tc.className}`}>
                           {tc.label}
                         </Badge>
+                        {billing.is_sinal && (
+                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-200">
+                            Sinal
+                          </Badge>
+                        )}
                         <p className="text-sm text-foreground">
                           {billing.description || "Faturamento"}
                         </p>
