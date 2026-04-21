@@ -4,8 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, User, Check, X, ChevronDown, ChevronUp } from "lucide-react";
-import { formatCurrency } from "@/lib/formatCurrency";
+import { Shield, User, Check, ChevronDown, ChevronUp, Search, Eye, Pencil } from "lucide-react";
 
 export default function UserManagement() {
   const queryClient = useQueryClient();
@@ -27,19 +26,17 @@ export default function UserManagement() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: async ({ userEmail, contractIds, isAdmin }) => {
+    mutationFn: async ({ userEmail, contractIds, editableIds, isAdmin }) => {
       const existing = accesses.find((a) => a.user_email === userEmail);
+      const payload = {
+        allowed_contract_ids: contractIds,
+        editable_contract_ids: editableIds,
+        is_admin: isAdmin,
+      };
       if (existing) {
-        return base44.entities.UserAccess.update(existing.id, {
-          allowed_contract_ids: contractIds,
-          is_admin: isAdmin,
-        });
+        return base44.entities.UserAccess.update(existing.id, payload);
       } else {
-        return base44.entities.UserAccess.create({
-          user_email: userEmail,
-          allowed_contract_ids: contractIds,
-          is_admin: isAdmin,
-        });
+        return base44.entities.UserAccess.create({ user_email: userEmail, ...payload });
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["useraccesses"] }),
@@ -61,7 +58,7 @@ export default function UserManagement() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Gerenciar Usuários</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Defina quais projetos cada usuário pode visualizar
+          Defina quais projetos cada usuário pode visualizar e editar
         </p>
       </div>
 
@@ -113,8 +110,8 @@ export default function UserManagement() {
                     user={user}
                     contracts={contracts}
                     access={access}
-                    onSave={({ contractIds, isAdmin }) =>
-                      saveMutation.mutate({ userEmail: user.email, contractIds, isAdmin })
+                    onSave={({ contractIds, editableIds, isAdmin }) =>
+                      saveMutation.mutate({ userEmail: user.email, contractIds, editableIds, isAdmin })
                     }
                     isPending={saveMutation.isPending}
                   />
@@ -137,15 +134,39 @@ export default function UserManagement() {
 function UserPermissionPanel({ user, contracts, access, onSave, isPending }) {
   const [isAdmin, setIsAdmin] = useState(access?.is_admin || user.role === "admin");
   const [selectedIds, setSelectedIds] = useState(access?.allowed_contract_ids || []);
+  const [editableIds, setEditableIds] = useState(access?.editable_contract_ids || []);
+  const [search, setSearch] = useState("");
 
-  const toggleContract = (id) => {
-    setSelectedIds((prev) =>
+  const filtered = contracts.filter(
+    (c) =>
+      c.project.toLowerCase().includes(search.toLowerCase()) ||
+      c.client.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleView = (id) => {
+    setSelectedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      // Se remover acesso de visualização, remove edição também
+      if (!next.includes(id)) setEditableIds((e) => e.filter((x) => x !== id));
+      return next;
+    });
+  };
+
+  const toggleEdit = (id) => {
+    // Só pode editar se já tiver acesso de visualização
+    if (!selectedIds.includes(id)) return;
+    setEditableIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
-  const toggleAll = () => {
-    setSelectedIds(selectedIds.length === contracts.length ? [] : contracts.map((c) => c.id));
+  const toggleAllView = () => {
+    if (selectedIds.length === contracts.length) {
+      setSelectedIds([]);
+      setEditableIds([]);
+    } else {
+      setSelectedIds(contracts.map((c) => c.id));
+    }
   };
 
   return (
@@ -158,11 +179,7 @@ function UserPermissionPanel({ user, contracts, access, onSave, isPending }) {
             isAdmin ? "bg-primary" : "bg-border"
           }`}
         >
-          <span
-            className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
-              isAdmin ? "translate-x-4" : "translate-x-0"
-            }`}
-          />
+          <span className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${isAdmin ? "translate-x-4" : "translate-x-0"}`} />
         </button>
         <div>
           <p className="text-sm font-medium">Administrador</p>
@@ -170,49 +187,94 @@ function UserPermissionPanel({ user, contracts, access, onSave, isPending }) {
         </div>
       </div>
 
-      {/* Seleção de contratos (apenas se não for admin) */}
+      {/* Seleção de contratos */}
       {!isAdmin && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-foreground">Projetos permitidos</p>
-            <button
-              onClick={toggleAll}
-              className="text-xs text-primary hover:underline"
-            >
-              {selectedIds.length === contracts.length ? "Desmarcar todos" : "Selecionar todos"}
+          {/* Barra de filtro */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Filtrar projetos..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <button onClick={toggleAllView} className="text-xs text-primary hover:underline whitespace-nowrap">
+              {selectedIds.length === contracts.length ? "Desmarcar todos" : "Todos"}
             </button>
           </div>
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-            {contracts.map((contract) => {
-              const selected = selectedIds.includes(contract.id);
+
+          {/* Legenda */}
+          <div className="flex items-center gap-4 mb-2 px-1">
+            <span className="text-xs text-muted-foreground font-medium flex-1">Projeto</span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground w-16 justify-center">
+              <Eye className="w-3 h-3" /> Ver
+            </span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground w-16 justify-center">
+              <Pencil className="w-3 h-3" /> Editar
+            </span>
+          </div>
+
+          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+            {filtered.map((contract) => {
+              const canView = selectedIds.includes(contract.id);
+              const canEdit = editableIds.includes(contract.id);
               return (
-                <button
+                <div
                   key={contract.id}
-                  onClick={() => toggleContract(contract.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-colors ${
-                    selected
-                      ? "border-primary/40 bg-primary/5"
-                      : "border-border bg-background hover:bg-muted/50"
+                  className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-colors ${
+                    canView ? "border-primary/30 bg-primary/5" : "border-border bg-background"
                   }`}
                 >
-                  <div>
-                    <p className="text-sm font-medium">{contract.project}</p>
-                    <p className="text-xs text-muted-foreground">{contract.client}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{contract.project}</p>
+                    <p className="text-xs text-muted-foreground truncate">{contract.client}</p>
                   </div>
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                    selected ? "border-primary bg-primary" : "border-border"
-                  }`}>
-                    {selected && <Check className="w-3 h-3 text-white" />}
+
+                  {/* Visualização */}
+                  <div className="w-16 flex justify-center">
+                    <button
+                      onClick={() => toggleView(contract.id)}
+                      className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                        canView ? "border-primary bg-primary" : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {canView && <Check className="w-3.5 h-3.5 text-white" />}
+                    </button>
                   </div>
-                </button>
+
+                  {/* Edição */}
+                  <div className="w-16 flex justify-center">
+                    <button
+                      onClick={() => toggleEdit(contract.id)}
+                      disabled={!canView}
+                      className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                        canEdit
+                          ? "border-amber-500 bg-amber-500"
+                          : canView
+                          ? "border-border hover:border-amber-400"
+                          : "border-border opacity-30 cursor-not-allowed"
+                      }`}
+                    >
+                      {canEdit && <Check className="w-3.5 h-3.5 text-white" />}
+                    </button>
+                  </div>
+                </div>
               );
             })}
+
+            {filtered.length === 0 && (
+              <p className="text-center py-6 text-sm text-muted-foreground">Nenhum projeto encontrado</p>
+            )}
           </div>
         </div>
       )}
 
       <Button
-        onClick={() => onSave({ contractIds: isAdmin ? [] : selectedIds, isAdmin })}
+        onClick={() => onSave({ contractIds: isAdmin ? [] : selectedIds, editableIds: isAdmin ? [] : editableIds, isAdmin })}
         disabled={isPending}
         className="w-full"
       >
