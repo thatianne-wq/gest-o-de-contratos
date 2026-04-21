@@ -1,0 +1,27 @@
+{
+  "name": "Additive",
+  "type": "object",
+  "properties": {
+    "contract_id": {
+      "type": "string",
+      "description": "ID do contrato relacionado"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do aditivo"
+    },
+    "value": {
+      "type": "number",
+      "description": "Valor do aditivo"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do aditivo"
+    }
+  },
+  "required": [
+    "contract_id",
+    "value"
+  ]
+}

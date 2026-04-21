@@ -1,0 +1,42 @@
+{
+  "name": "Contract",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "Nome do projeto"
+    },
+    "client": {
+      "type": "string",
+      "description": "Nome do cliente"
+    },
+    "initial_value": {
+      "type": "number",
+      "description": "Valor do contrato inicial"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "cancelled"
+      ],
+      "default": "active",
+      "description": "Status do contrato"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio do contrato"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es sobre o contrato"
+    }
+  },
+  "required": [
+    "project",
+    "client",
+    "initial_value"
+  ]
+}
