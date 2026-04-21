@@ -53,9 +53,20 @@ export default function ContractDetail() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => base44.entities.Contract.delete(contractId),
+    mutationFn: async () => {
+      // Deleta faturamentos e aditivos vinculados antes de excluir o contrato
+      const billingIds = allBillings.filter((b) => b.contract_id === contractId).map((b) => b.id);
+      const additiveIds = allAdditives.filter((a) => a.contract_id === contractId).map((a) => a.id);
+      await Promise.all([
+        ...billingIds.map((id) => base44.entities.Billing.delete(id)),
+        ...additiveIds.map((id) => base44.entities.Additive.delete(id)),
+      ]);
+      await base44.entities.Contract.delete(contractId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["billings"] });
+      queryClient.invalidateQueries({ queryKey: ["additives"] });
       navigate("/contracts");
     },
   });
