@@ -22,48 +22,98 @@ function getContractTotals(contract, allAdditives, allBillings) {
 
 const currencyFormatter = (v) => formatCurrency(v);
 
-export default function DashboardCharts({ contracts, additives, billings }) {
-  // Bar chart: por contrato
-  const barData = contracts.map((c) => {
+export default function DashboardCharts({ contracts, additives, billings, allContracts, filterProject, onFilterProject }) {
+  // Use allContracts for building chart data (so charts always show all bars/slices)
+  const sourceContracts = allContracts || contracts;
+
+  const barData = sourceContracts.map((c) => {
     const { contractTotal, totalBilled, balance } = getContractTotals(c, additives, billings);
     return {
+      id: c.id,
       name: c.project.length > 14 ? c.project.slice(0, 14) + "…" : c.project,
+      fullName: c.project,
       "Valor Contrato": contractTotal,
       "Faturado": totalBilled,
       "Saldo": balance > 0 ? balance : 0,
     };
   });
 
-  // Pie chart: distribuição do saldo por projeto
-  const pieData = contracts
+  const pieData = sourceContracts
     .map((c) => {
       const { balance } = getContractTotals(c, additives, billings);
-      return { name: c.project, value: balance > 0 ? balance : 0 };
+      return { id: c.id, name: c.project, value: balance > 0 ? balance : 0 };
     })
     .filter((d) => d.value > 0);
+
+  const handleBarClick = (data) => {
+    if (!data || !onFilterProject) return;
+    const clicked = sourceContracts.find((c) => c.project === data.activePayload?.[0]?.payload?.fullName);
+    if (!clicked) return;
+    onFilterProject(filterProject === clicked.id ? "" : clicked.id);
+  };
+
+  const handlePieClick = (data) => {
+    if (!data || !onFilterProject) return;
+    onFilterProject(filterProject === data.id ? "" : data.id);
+  };
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       {/* Bar Chart */}
       <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-        <h3 className="font-semibold text-foreground mb-4">Contrato vs Faturado vs Saldo</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-foreground">Contrato vs Faturado vs Saldo</h3>
+          <span className="text-xs text-muted-foreground">Clique para filtrar</span>
+        </div>
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={barData} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+          <BarChart
+            data={barData}
+            margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+            onClick={handleBarClick}
+            style={{ cursor: "pointer" }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
             <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
             <Tooltip formatter={currencyFormatter} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="Valor Contrato" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Faturado" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Saldo" fill="#10b981" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Valor Contrato" radius={[4, 4, 0, 0]}>
+              {barData.map((entry) => (
+                <Cell
+                  key={entry.id}
+                  fill="#f59e0b"
+                  opacity={!filterProject || filterProject === entry.id ? 1 : 0.35}
+                />
+              ))}
+            </Bar>
+            <Bar dataKey="Faturado" radius={[4, 4, 0, 0]}>
+              {barData.map((entry) => (
+                <Cell
+                  key={entry.id}
+                  fill="#3b82f6"
+                  opacity={!filterProject || filterProject === entry.id ? 1 : 0.35}
+                />
+              ))}
+            </Bar>
+            <Bar dataKey="Saldo" radius={[4, 4, 0, 0]}>
+              {barData.map((entry) => (
+                <Cell
+                  key={entry.id}
+                  fill="#10b981"
+                  opacity={!filterProject || filterProject === entry.id ? 1 : 0.35}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* Pie Chart */}
       <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-        <h3 className="font-semibold text-foreground mb-4">Distribuição do Saldo por Projeto</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-foreground">Distribuição do Saldo por Projeto</h3>
+          <span className="text-xs text-muted-foreground">Clique para filtrar</span>
+        </div>
         {pieData.length === 0 ? (
           <div className="flex items-center justify-center h-[260px] text-sm text-muted-foreground">
             Sem saldo disponível
@@ -77,11 +127,21 @@ export default function DashboardCharts({ contracts, additives, billings }) {
                 cy="50%"
                 outerRadius={90}
                 dataKey="value"
-                label={({ name, percent }) => `${name.slice(0, 10)}… ${(percent * 100).toFixed(0)}%`}
+                onClick={handlePieClick}
+                style={{ cursor: "pointer" }}
+                label={({ name, percent }) =>
+                  `${name.length > 10 ? name.slice(0, 10) + "…" : name} ${(percent * 100).toFixed(0)}%`
+                }
                 labelLine={false}
               >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                {pieData.map((entry, i) => (
+                  <Cell
+                    key={entry.id}
+                    fill={COLORS[i % COLORS.length]}
+                    opacity={!filterProject || filterProject === entry.id ? 1 : 0.35}
+                    stroke={filterProject === entry.id ? "#fff" : "none"}
+                    strokeWidth={filterProject === entry.id ? 3 : 0}
+                  />
                 ))}
               </Pie>
               <Tooltip formatter={currencyFormatter} />
