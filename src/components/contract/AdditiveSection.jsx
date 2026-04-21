@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-export default function AdditiveSection({ contractId, additives }) {
+export default function AdditiveSection({ contractId, additives, billings = [] }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ description: "", value_empresa: "", value_fd: "", date: "" });
@@ -30,8 +30,16 @@ export default function AdditiveSection({ contractId, additives }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Additive.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["additives"] }),
+    mutationFn: async (id) => {
+      // Deleta billings vinculados ao aditivo antes de excluí-lo
+      const linkedBillings = billings.filter((b) => b.additive_id === id);
+      await Promise.all(linkedBillings.map((b) => base44.entities.Billing.delete(b.id)));
+      await base44.entities.Additive.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["additives"] });
+      queryClient.invalidateQueries({ queryKey: ["billings"] });
+    },
   });
 
   const handleSubmit = (e) => {

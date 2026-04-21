@@ -167,7 +167,7 @@ export default function ContractDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <AdditiveSection contractId={contractId} additives={additives} />
+          <AdditiveSection contractId={contractId} additives={additives} billings={billings} />
           <BillingSection contractId={contractId} billings={billings} additives={additives} filterMonth={filterMonth} onFilterMonthChange={setFilterMonth} />
         </div>
         <div>
