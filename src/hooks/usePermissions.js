@@ -11,9 +11,10 @@ export function usePermissions() {
     queryFn: () => base44.auth.me(),
   });
 
-  const { data: accesses = [] } = useQuery({
-    queryKey: ["useraccesses"],
-    queryFn: () => base44.entities.UserAccess.list(),
+  const { data: myAccesses = [] } = useQuery({
+    queryKey: ["useraccesses", currentUser?.email],
+    queryFn: () => base44.entities.UserAccess.filter({ user_email: currentUser.email }),
+    enabled: !!currentUser,
   });
 
   const { data: profiles = [] } = useQuery({
@@ -27,7 +28,7 @@ export function usePermissions() {
 
   // Admins têm tudo liberado
   const isAdmin = currentUser.role === "admin";
-  const access = accesses.find((a) => a.user_email === currentUser.email);
+  const access = myAccesses[0];
   const isAccessAdmin = access?.is_admin;
 
   if (isAdmin || isAccessAdmin) {
