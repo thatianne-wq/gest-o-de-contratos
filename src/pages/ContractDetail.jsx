@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import AdditiveSection from "../components/contract/AdditiveSection";
 import BillingSection from "../components/contract/BillingSection";
+import { usePermissions } from "@/hooks/usePermissions";
 import BalanceSummary from "../components/contract/BalanceSummary";
 import SiengeLinkSection from "../components/contract/SiengeLinkSection";
 import {
@@ -36,6 +37,7 @@ export default function ContractDetail() {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
   const [filterMonth, setFilterMonth] = useState("");
   const [activeTab, setActiveTab] = useState("financeiro");
 
@@ -132,12 +134,15 @@ export default function ContractDetail() {
             )}
           </div>
           <div className="flex gap-2">
+            {can("contracts", "edit") && (
             <Link to={`/contracts/${contractId}/edit`}>
               <Button variant="outline" size="sm" className="gap-2">
                 <Pencil className="w-3.5 h-3.5" />
                 Editar
               </Button>
             </Link>
+            )}
+            {can("contracts", "delete") && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive">
@@ -163,6 +168,7 @@ export default function ContractDetail() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            )}
           </div>
         </div>
       </div>

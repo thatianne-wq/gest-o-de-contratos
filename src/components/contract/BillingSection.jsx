@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ const emptyForm = { description: "", value: "", month: "", date: "", type: "medi
 
 export default function BillingSection({ contractId, contract, billings, additives = [], filterMonth = "", onFilterMonthChange }) {
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
@@ -123,9 +125,11 @@ export default function BillingSection({ contractId, contract, billings, additiv
               </Select>
             )}
 
-            <SiengeImportDialog contract={contract} contractId={contractId} />
+            {can("billings", "sync") && <SiengeImportDialog contract={contract} contractId={contractId} />}
 
+            {can("billings", "create") && (
             <Dialog open={open} onOpenChange={setOpen}>
+
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2">
                   <Plus className="w-3.5 h-3.5" />
@@ -250,6 +254,7 @@ export default function BillingSection({ contractId, contract, billings, additiv
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
       </div>
@@ -293,12 +298,14 @@ export default function BillingSection({ contractId, contract, billings, additiv
                       </div>
                       <div className="flex items-center gap-4">
                         <span className="text-sm font-semibold">{formatCurrency(billing.value)}</span>
+                        {can("billings", "delete") && (
                         <button
                           onClick={() => deleteMutation.mutate(billing.id)}
                           className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
+                        )}
                       </div>
                     </div>
                   );

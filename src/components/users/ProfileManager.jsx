@@ -5,60 +5,65 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Shield, Check, X } from "lucide-react";
 
-const PERMISSION_GROUPS = [
+const MODULES = [
   {
     key: "contracts",
     label: "Contratos",
-    perms: [
+    description: "Cadastro e gestão de projetos",
+    actions: [
       { key: "view", label: "Visualizar" },
-      { key: "create", label: "Criar" },
-      { key: "edit", label: "Editar" },
+      { key: "create", label: "Cadastrar novo" },
+      { key: "edit", label: "Editar dados" },
       { key: "delete", label: "Excluir" },
-      { key: "export", label: "Exportar" },
+      { key: "export", label: "Exportar (Excel)" },
     ],
   },
   {
     key: "billings",
     label: "Faturamentos",
-    perms: [
+    description: "Medições e FDs dos contratos",
+    actions: [
       { key: "view", label: "Visualizar" },
-      { key: "create", label: "Criar" },
-      { key: "edit", label: "Editar" },
-      { key: "delete", label: "Excluir" },
-      { key: "export", label: "Exportar" },
+      { key: "create", label: "Lançar faturamento" },
+      { key: "delete", label: "Excluir faturamento" },
+      { key: "export", label: "Exportar (Excel)" },
+      { key: "sync", label: "Importar do Sienge" },
     ],
   },
   {
     key: "additives",
     label: "Aditivos",
-    perms: [
+    description: "Aditivos contratuais",
+    actions: [
       { key: "view", label: "Visualizar" },
-      { key: "create", label: "Criar" },
-      { key: "edit", label: "Editar" },
-      { key: "delete", label: "Excluir" },
+      { key: "create", label: "Cadastrar aditivo" },
+      { key: "edit", label: "Editar aditivo" },
+      { key: "delete", label: "Excluir aditivo" },
     ],
   },
   {
     key: "sienge",
-    label: "Sienge",
-    perms: [
-      { key: "view", label: "Visualizar" },
-      { key: "sync", label: "Sincronizar" },
+    label: "Sienge / Integração",
+    description: "Acesso ao painel de importação Sienge",
+    actions: [
+      { key: "view", label: "Acessar página Sienge" },
+      { key: "sync", label: "Executar sincronização" },
     ],
   },
   {
     key: "users",
     label: "Usuários",
-    perms: [
-      { key: "view", label: "Visualizar" },
-      { key: "manage", label: "Gerenciar" },
+    description: "Gestão de usuários e perfis",
+    actions: [
+      { key: "view", label: "Visualizar usuários" },
+      { key: "manage", label: "Gerenciar permissões" },
     ],
   },
 ];
 
 const DEFAULT_PERMISSIONS = {
   contracts: { view: true, create: false, edit: false, delete: false, export: false },
-  billings: { view: true, create: false, edit: false, delete: false, export: false },
+  billings: { view: true, create: false, delete: false, export: false, sync: false },
   additives: { view: true, create: false, edit: false, delete: false },
   sienge: { view: false, sync: false },
   users: { view: false, manage: false },
@@ -67,12 +72,17 @@ const DEFAULT_PERMISSIONS = {
 function PermToggle({ checked, onChange }) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!checked)}
-      className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-        checked ? "border-primary bg-primary" : "border-border hover:border-primary/50"
+      className={`relative inline-flex items-center h-6 w-11 rounded-full transition-colors ${
+        checked ? "bg-primary" : "bg-border"
       }`}
     >
-      {checked && <Check className="w-3.5 h-3.5 text-white" />}
+      <span
+        className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform ${
+          checked ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
     </button>
   );
 }
@@ -81,18 +91,20 @@ function ProfileForm({ profile, onSave, onCancel, isPending }) {
   const [name, setName] = useState(profile?.name || "");
   const [description, setDescription] = useState(profile?.description || "");
   const [permissions, setPermissions] = useState(
-    profile?.permissions || DEFAULT_PERMISSIONS
+    profile?.permissions
+      ? { ...DEFAULT_PERMISSIONS, ...profile.permissions }
+      : DEFAULT_PERMISSIONS
   );
 
-  const togglePerm = (group, perm, value) => {
+  const togglePerm = (module, action, value) => {
     setPermissions((prev) => ({
       ...prev,
-      [group]: { ...prev[group], [perm]: value },
+      [module]: { ...prev[module], [action]: value },
     }));
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1 block">Nome do Perfil *</label>
@@ -116,50 +128,30 @@ function ProfileForm({ profile, onSave, onCancel, isPending }) {
         </div>
       </div>
 
-      {/* Tabela de permissões */}
-      <div className="border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Módulo</th>
-              <th className="text-center px-2 py-2.5 text-xs font-semibold text-muted-foreground">Ver</th>
-              <th className="text-center px-2 py-2.5 text-xs font-semibold text-muted-foreground">Criar</th>
-              <th className="text-center px-2 py-2.5 text-xs font-semibold text-muted-foreground">Editar</th>
-              <th className="text-center px-2 py-2.5 text-xs font-semibold text-muted-foreground">Excluir</th>
-              <th className="text-center px-2 py-2.5 text-xs font-semibold text-muted-foreground">Exportar / Extra</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {PERMISSION_GROUPS.map((group) => (
-              <tr key={group.key} className="hover:bg-muted/20 transition-colors">
-                <td className="px-4 py-3 font-medium text-sm">{group.label}</td>
-                {["view", "create", "edit", "delete", "export_or_extra"].map((col) => {
-                  // map generic column to actual perm key
-                  let permKey = col === "export_or_extra"
-                    ? group.perms.find((p) => p.key === "export" || p.key === "sync" || p.key === "manage")?.key
-                    : group.perms.find((p) => p.key === col)?.key;
-
-                  if (!permKey) {
-                    return <td key={col} className="px-2 py-3 text-center"><span className="text-muted-foreground/30">—</span></td>;
-                  }
-                  return (
-                    <td key={col} className="px-2 py-3 text-center">
-                      <div className="flex justify-center">
-                        <PermToggle
-                          checked={permissions[group.key]?.[permKey] ?? false}
-                          onChange={(val) => togglePerm(group.key, permKey, val)}
-                        />
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Módulos e permissões */}
+      <div className="space-y-3">
+        {MODULES.map((mod) => (
+          <div key={mod.key} className="border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-muted/40 border-b border-border">
+              <p className="text-sm font-semibold">{mod.label}</p>
+              <p className="text-xs text-muted-foreground">{mod.description}</p>
+            </div>
+            <div className="divide-y divide-border">
+              {mod.actions.map((action) => (
+                <div key={action.key} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-foreground">{action.label}</span>
+                  <PermToggle
+                    checked={permissions[mod.key]?.[action.key] ?? false}
+                    onChange={(val) => togglePerm(mod.key, action.key, val)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end pt-2">
         <Button variant="outline" onClick={onCancel} size="sm">
           <X className="w-4 h-4 mr-1" /> Cancelar
         </Button>
@@ -196,7 +188,7 @@ export default function ProfileManager() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profiles"] }),
   });
 
-  const countPerms = (profile) => {
+  const countActive = (profile) => {
     let count = 0;
     Object.values(profile.permissions || {}).forEach((group) => {
       Object.values(group).forEach((v) => { if (v) count++; });
@@ -209,7 +201,9 @@ export default function ProfileManager() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Perfis de Acesso</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Defina o que cada perfil pode visualizar, editar, excluir e exportar</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Defina por módulo o que cada perfil pode fazer
+          </p>
         </div>
         {!creating && (
           <Button size="sm" onClick={() => setCreating(true)}>
@@ -218,7 +212,6 @@ export default function ProfileManager() {
         )}
       </div>
 
-      {/* Formulário de criação */}
       {creating && (
         <div className="bg-card border border-border rounded-xl p-5">
           <p className="text-sm font-semibold mb-4">Novo Perfil</p>
@@ -230,10 +223,9 @@ export default function ProfileManager() {
         </div>
       )}
 
-      {/* Lista de perfis */}
       {isLoading ? (
         <div className="space-y-2">
-          {Array(3).fill(0).map((_, i) => (
+          {Array(2).fill(0).map((_, i) => (
             <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
           ))}
         </div>
@@ -272,7 +264,7 @@ export default function ProfileManager() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs">
-                      {countPerms(profile)} permissões ativas
+                      {countActive(profile)} ações permitidas
                     </Badge>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(profile.id)}>
                       <Pencil className="w-3.5 h-3.5" />

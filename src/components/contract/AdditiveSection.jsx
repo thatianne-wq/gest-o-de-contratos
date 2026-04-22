@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,7 @@ import {
 
 export default function AdditiveSection({ contractId, additives, billings = [] }) {
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ description: "", value_empresa: "", value_fd: "", date: "" });
 
@@ -76,7 +78,7 @@ export default function AdditiveSection({ contractId, additives, billings = [] }
             </p>
           </div>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        {can("additives", "create") && (<Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-2">
               <Plus className="w-3.5 h-3.5" />
@@ -136,7 +138,7 @@ export default function AdditiveSection({ contractId, additives, billings = [] }
               </div>
             </form>
           </DialogContent>
-        </Dialog>
+        </Dialog>)}
       </div>
 
       <div className="divide-y divide-border">
@@ -169,12 +171,14 @@ export default function AdditiveSection({ contractId, additives, billings = [] }
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-sm font-semibold">{formatCurrency(subtotal)}</span>
+                {can("additives", "delete") && (
                 <button
                   onClick={() => deleteMutation.mutate(additive.id)}
                   className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
+                )}
               </div>
             </div>
           );
