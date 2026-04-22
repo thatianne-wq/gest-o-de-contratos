@@ -11,9 +11,10 @@ export function useAccessFilter(contracts = []) {
     queryFn: () => base44.auth.me(),
   });
 
-  const { data: accesses = [] } = useQuery({
-    queryKey: ["useraccesses"],
-    queryFn: () => base44.entities.UserAccess.list(),
+  const { data: myAccesses = [] } = useQuery({
+    queryKey: ["useraccesses", currentUser?.email],
+    queryFn: () => base44.entities.UserAccess.filter({ user_email: currentUser.email }),
+    enabled: !!currentUser,
   });
 
   if (!currentUser) return { allowedContracts: contracts, isAdmin: false, isLoading: true };
@@ -21,7 +22,7 @@ export function useAccessFilter(contracts = []) {
   const isAdmin = currentUser.role === "admin";
   if (isAdmin) return { allowedContracts: contracts, isAdmin: true, isLoading: false, canEdit: () => true, editableIds: contracts.map(c => c.id) };
 
-  const access = accesses.find((a) => a.user_email === currentUser.email);
+  const access = myAccesses[0];
 
   if (access?.is_admin) return { allowedContracts: contracts, isAdmin: true, isLoading: false, canEdit: () => true, editableIds: contracts.map(c => c.id) };
 

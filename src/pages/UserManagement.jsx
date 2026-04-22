@@ -4,18 +4,15 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, User, Check, ChevronDown, ChevronUp, Search, Eye, Pencil, Users, Layers } from "lucide-react";
+import { Shield, User, Check, ChevronDown, ChevronUp, Search, Eye, Pencil, Users, Layers, Plus, Trash2, Power, PowerOff } from "lucide-react";
 import ProfileManager from "@/components/users/ProfileManager";
 
 export default function UserManagement() {
   const [tab, setTab] = useState("users");
   const queryClient = useQueryClient();
   const [expandedUser, setExpandedUser] = useState(null);
-
-  const { data: users = [], isLoading: loadingUsers } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => base44.entities.User.list(),
-  });
+  const [newEmail, setNewEmail] = useState("");
+  const [addingUser, setAddingUser] = useState(false);
 
   const { data: contracts = [], isLoading: loadingContracts } = useQuery({
     queryKey: ["contracts"],
@@ -32,32 +29,64 @@ export default function UserManagement() {
     queryFn: () => base44.entities.Profile.list(),
   });
 
+  const createAccessMutation = useMutation({
+    mutationFn: (email) =>
+      base44.entities.UserAccess.create({
+        user_email: email.trim().toLowerCase(),
+        is_active: true,
+        is_admin: false,
+        allowed_contract_ids: [],
+        editable_contract_ids: [],
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["useraccesses"] });
+      setNewEmail("");
+      setAddingUser(false);
+    },
+  });
+
   const saveMutation = useMutation({
-    mutationFn: async ({ userEmail, contractIds, editableIds, isAdmin, profileId }) => {
-      const existing = accesses.find((a) => a.user_email === userEmail);
+    mutationFn: async ({ accessId, userEmail, contractIds, editableIds, isAdmin, profileId }) => {
       const payload = {
         allowed_contract_ids: contractIds,
         editable_contract_ids: editableIds,
         is_admin: isAdmin,
         profile_id: profileId || null,
       };
-      if (existing) {
-        return base44.entities.UserAccess.update(existing.id, payload);
+      if (accessId) {
+        return base44.entities.UserAccess.update(accessId, payload);
       } else {
-        return base44.entities.UserAccess.create({ user_email: userEmail, ...payload });
+        return base44.entities.UserAccess.create({ user_email: userEmail, is_active: true, ...payload });
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["useraccesses"] }),
   });
 
-  const isLoading = loadingUsers || loadingContracts || loadingAccesses;
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }) => base44.entities.UserAccess.update(id, { is_active }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["useraccesses"] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.UserAccess.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["useraccesses"] }),
+  });
+
+  const handleAddUser = () => {
+    if (!newEmail.trim()) return;
+    const alreadyExists = accesses.find((a) => a.user_email === newEmail.trim().toLowerCase());
+    if (alreadyExists) { alert("Este email já está cadastrado."); return; }
+    createAccessMutation.mutate(newEmail);
+  };
+
+  const isLoading = loadingContracts || loadingAccesses;
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Gerenciar Usuários</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Crie perfis de acesso e atribua-os aos usuários
+          Cadastre emails autorizados e defina permissões de acesso
         </p>
       </div>
 
@@ -85,61 +114,138 @@ export default function UserManagement() {
 
       {tab === "users" && (
         <>
+          {/* Adicionar novo usuário */}
+          <div className="bg-card border border-border rounded-xl p-4">
+            {!addingUser ? (
+              <button
+                onClick={() => setAddingUser(true)}
+                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Cadastrar novo usuário por email
+              </button>
+            ) : (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddUser()}
+                  autoFocus
+                  className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <Button size="sm" onClick={handleAddUser} disabled={createAccessMutation.isPending}>
+                  {createAccessMutation.isPending ? "Salvando..." : "Adicionar"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setAddingUser(false); setNewEmail(""); }}>
+                  Cancelar
+                </Button>
+              </div>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="space-y-4">
               {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
             <div className="space-y-3">
-              {users.map((user) => {
-                const access = accesses.find((a) => a.user_email === user.email);
-                const isAdmin = access?.is_admin || user.role === "admin";
-                const allowedIds = access?.allowed_contract_ids || [];
-                const isExpanded = expandedUser === user.id;
-                const assignedProfile = profiles.find((p) => p.id === access?.profile_id);
+              {accesses.map((access) => {
+                const isActive = access.is_active !== false;
+                const isExpanded = expandedUser === access.id;
+                const assignedProfile = profiles.find((p) => p.id === access.profile_id);
 
                 return (
-                  <div key={user.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-                    <div
-                      className="flex items-center justify-between p-5 cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => setExpandedUser(isExpanded ? null : user.id)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                          {isAdmin ? (
-                            <Shield className="w-4 h-4 text-primary" />
-                          ) : (
-                            <User className="w-4 h-4 text-muted-foreground" />
-                          )}
+                  <div
+                    key={access.id}
+                    className={`bg-card rounded-xl border shadow-sm overflow-hidden transition-colors ${
+                      isActive ? "border-border" : "border-border opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between p-4">
+                      {/* Info — clicável para expandir */}
+                      <div
+                        className="flex items-center gap-3 flex-1 cursor-pointer"
+                        onClick={() => setExpandedUser(isExpanded ? null : access.id)}
+                      >
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                          access.is_admin ? "bg-primary/10" : "bg-muted"
+                        }`}>
+                          {access.is_admin
+                            ? <Shield className="w-4 h-4 text-primary" />
+                            : <User className="w-4 h-4 text-muted-foreground" />
+                          }
                         </div>
                         <div>
-                          <p className="font-medium text-sm text-foreground">{user.full_name || user.email}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                          <p className="font-medium text-sm text-foreground">{access.user_email}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {!isActive && (
+                              <Badge variant="outline" className="text-xs text-destructive border-destructive/30">Desativado</Badge>
+                            )}
+                            {access.is_admin ? (
+                              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">Admin</Badge>
+                            ) : assignedProfile ? (
+                              <Badge variant="outline" className="text-xs">{assignedProfile.name}</Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                {(access.allowed_contract_ids || []).length} projeto(s)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {isAdmin ? (
-                          <Badge className="bg-primary/10 text-primary border-primary/20">Admin</Badge>
-                        ) : assignedProfile ? (
-                          <Badge variant="outline" className="text-xs">{assignedProfile.name}</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground text-xs">
-                            {allowedIds.length === 0 ? "Sem acesso" : `${allowedIds.length} projeto(s)`}
-                          </Badge>
-                        )}
-                        {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+
+                      {/* Ações */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          title={isActive ? "Desativar acesso" : "Ativar acesso"}
+                          onClick={() => toggleActiveMutation.mutate({ id: access.id, is_active: !isActive })}
+                          className={`p-2 rounded-lg transition-colors ${
+                            isActive
+                              ? "hover:bg-amber-50 text-amber-600"
+                              : "hover:bg-green-50 text-green-600"
+                          }`}
+                        >
+                          {isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                        </button>
+                        <button
+                          title="Excluir usuário"
+                          onClick={() => {
+                            if (confirm(`Remover acesso de ${access.user_email}?`)) {
+                              deleteMutation.mutate(access.id);
+                            }
+                          }}
+                          className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setExpandedUser(isExpanded ? null : access.id)}
+                          className="p-2 rounded-lg hover:bg-muted transition-colors"
+                        >
+                          {isExpanded
+                            ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                            : <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          }
+                        </button>
                       </div>
                     </div>
 
                     {isExpanded && (
                       <div className="border-t border-border p-5 space-y-4">
                         <UserPermissionPanel
-                          user={user}
+                          access={access}
                           contracts={contracts}
                           profiles={profiles}
-                          access={access}
                           onSave={({ contractIds, editableIds, isAdmin, profileId }) =>
-                            saveMutation.mutate({ userEmail: user.email, contractIds, editableIds, isAdmin, profileId })
+                            saveMutation.mutate({
+                              accessId: access.id,
+                              userEmail: access.user_email,
+                              contractIds,
+                              editableIds,
+                              isAdmin,
+                              profileId,
+                            })
                           }
                           isPending={saveMutation.isPending}
                         />
@@ -149,9 +255,9 @@ export default function UserManagement() {
                 );
               })}
 
-              {users.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground text-sm">
-                  Nenhum usuário encontrado
+              {accesses.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground text-sm border-2 border-dashed border-border rounded-xl">
+                  Nenhum usuário cadastrado ainda. Adicione um email acima.
                 </div>
               )}
             </div>
@@ -162,8 +268,8 @@ export default function UserManagement() {
   );
 }
 
-function UserPermissionPanel({ user, contracts, profiles, access, onSave, isPending }) {
-  const [isAdmin, setIsAdmin] = useState(access?.is_admin || user.role === "admin");
+function UserPermissionPanel({ access, contracts, profiles, onSave, isPending }) {
+  const [isAdmin, setIsAdmin] = useState(access?.is_admin || false);
   const [selectedIds, setSelectedIds] = useState(access?.allowed_contract_ids || []);
   const [editableIds, setEditableIds] = useState(access?.editable_contract_ids || []);
   const [profileId, setProfileId] = useState(access?.profile_id || "");
@@ -219,7 +325,6 @@ function UserPermissionPanel({ user, contracts, profiles, access, onSave, isPend
 
       {!isAdmin && (
         <>
-          {/* Seleção de perfil */}
           {profiles.length > 0 && (
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Perfil de Acesso</label>
@@ -233,15 +338,9 @@ function UserPermissionPanel({ user, contracts, profiles, access, onSave, isPend
                   <option key={p.id} value={p.id}>{p.name}{p.description ? ` — ${p.description}` : ""}</option>
                 ))}
               </select>
-              {profileId && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  As permissões do perfil serão aplicadas. O controle de projetos abaixo ainda define quais projetos o usuário acessa.
-                </p>
-              )}
             </div>
           )}
 
-          {/* Seleção de contratos */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="relative flex-1">

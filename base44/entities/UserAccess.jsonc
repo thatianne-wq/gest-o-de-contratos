@@ -6,6 +6,11 @@
       "type": "string",
       "description": "Email do usu\u00e1rio"
     },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se falso, o usu\u00e1rio est\u00e1 bloqueado e n\u00e3o consegue acessar o sistema"
+    },
     "allowed_contract_ids": {
       "type": "array",
       "items": {
@@ -18,12 +23,16 @@
       "items": {
         "type": "string"
       },
-      "description": "IDs dos contratos que o usu\u00e1rio pode editar (subconjunto dos permitidos)"
+      "description": "IDs dos contratos que o usu\u00e1rio pode editar"
     },
     "is_admin": {
       "type": "boolean",
       "default": false,
       "description": "Se verdadeiro, tem acesso e edi\u00e7\u00e3o total a todos os contratos"
+    },
+    "profile_id": {
+      "type": "string",
+      "description": "ID do perfil de permiss\u00f5es atribu\u00eddo"
     }
   },
   "required": [
