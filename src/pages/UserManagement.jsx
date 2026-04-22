@@ -254,8 +254,8 @@ function UserPermissionPanel({ user, contracts, profiles, access, onSave, isPend
                   className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
-              <button onClick={toggleAllView} className="text-xs text-primary hover:underline whitespace-nowrap">
-                {selectedIds.length === contracts.length ? "Desmarcar todos" : "Todos"}
+              <button onClick={toggleAllView} className="text-xs text-primary hover:underline whitespace-nowrap font-medium">
+                {selectedIds.length === contracts.length ? "✕ Desmarcar todos" : "✓ Selecionar todos"}
               </button>
             </div>
 
