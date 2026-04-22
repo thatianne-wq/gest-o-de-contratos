@@ -1,0 +1,120 @@
+{
+  "name": "Profile",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome do perfil (ex: Gerente, Visualizador)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do perfil"
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Permiss\u00f5es do perfil",
+      "properties": {
+        "contracts": {
+          "type": "object",
+          "properties": {
+            "view": {
+              "type": "boolean",
+              "default": true
+            },
+            "create": {
+              "type": "boolean",
+              "default": false
+            },
+            "edit": {
+              "type": "boolean",
+              "default": false
+            },
+            "delete": {
+              "type": "boolean",
+              "default": false
+            },
+            "export": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "billings": {
+          "type": "object",
+          "properties": {
+            "view": {
+              "type": "boolean",
+              "default": true
+            },
+            "create": {
+              "type": "boolean",
+              "default": false
+            },
+            "edit": {
+              "type": "boolean",
+              "default": false
+            },
+            "delete": {
+              "type": "boolean",
+              "default": false
+            },
+            "export": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "additives": {
+          "type": "object",
+          "properties": {
+            "view": {
+              "type": "boolean",
+              "default": true
+            },
+            "create": {
+              "type": "boolean",
+              "default": false
+            },
+            "edit": {
+              "type": "boolean",
+              "default": false
+            },
+            "delete": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "sienge": {
+          "type": "object",
+          "properties": {
+            "view": {
+              "type": "boolean",
+              "default": false
+            },
+            "sync": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "users": {
+          "type": "object",
+          "properties": {
+            "view": {
+              "type": "boolean",
+              "default": false
+            },
+            "manage": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
