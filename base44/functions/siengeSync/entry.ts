@@ -159,6 +159,31 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── BUSCAR BILLS POR ENTERPRISES VINCULADAS ─────────────────────
+    if (action === "get_bills_by_enterprises") {
+      const { enterpriseIds, startDate, endDate } = body;
+      if (!enterpriseIds || !enterpriseIds.length) {
+        return Response.json({ error: "enterpriseIds é obrigatório" }, { status: 400 });
+      }
+
+      const params = {};
+      if (startDate) params.startIssueDate = startDate;
+      if (endDate) params.endIssueDate = endDate;
+
+      const allBills = await fetchAllPages("accounts-receivable/receivable-bills", params);
+
+      // Filtra: nota deve mencionar "obra <id>" para algum dos IDs vinculados
+      const matched = allBills.filter(bill => {
+        const note = (bill.note || "").toLowerCase();
+        return enterpriseIds.some(id => {
+          const pattern = new RegExp(`\\b(obra|empreendimento|cc)\\s*[:#-]?\\s*0*${id}\\b`);
+          return pattern.test(note);
+        });
+      });
+
+      return Response.json({ count: matched.length, bills: matched });
+    }
+
     // ─── IMPORTAR BILLS SELECIONADAS MANUALMENTE ──────────────────────
     if (action === "import_bills") {
       const { contractId, bills } = body;
@@ -191,7 +216,27 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, imported });
     }
 
-    return Response.json({ error: "Ação inválida: test | get_customers | get_receivables | sync | import_bills" }, { status: 400 });
+    // ─── EXPLORAR ENDPOINT (debug) ────────────────────────────────────
+    if (action === "explore") {
+      const { path, params: extraParams } = body;
+      const data = await siengeGet(path, { limit: 5, ...extraParams });
+      return Response.json(data);
+    }
+
+    // ─── BUSCAR CENTROS DE CUSTO ──────────────────────────────────────
+    if (action === "get_cost_centers") {
+      const data = await fetchAllPages("enterprises");
+      return Response.json({
+        count: data.length,
+        cost_centers: data.map(e => ({
+          id: e.id,
+          name: e.name,
+          code: e.code || e.id,
+        }))
+      });
+    }
+
+    return Response.json({ error: "Ação inválida" }, { status: 400 });
 
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

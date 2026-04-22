@@ -35,6 +35,7 @@ export default function SiengeImport() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const [filterContractId, setFilterContractId] = useState(""); // contrato para filtro automático
   const [selectedBills, setSelectedBills] = useState(new Set());
   const [importContractId, setImportContractId] = useState("");
   const [importing, setImporting] = useState(false);
@@ -65,11 +66,23 @@ export default function SiengeImport() {
     setBills([]);
     setSelectedBills(new Set());
     try {
-      const params = { action: "get_receivables" };
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-      const res = await base44.functions.invoke("siengeSync", params);
-      setBills(res.data.bills || []);
+      const selectedContract = contracts.find(c => c.id === filterContractId);
+      const enterpriseIds = selectedContract?.sienge_enterprise_ids;
+
+      // Se o contrato tem enterprises vinculadas, filtra automaticamente
+      if (enterpriseIds && enterpriseIds.length > 0) {
+        const params = { action: "get_bills_by_enterprises", enterpriseIds };
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        const res = await base44.functions.invoke("siengeSync", params);
+        setBills(res.data.bills || []);
+      } else {
+        const params = { action: "get_receivables" };
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        const res = await base44.functions.invoke("siengeSync", params);
+        setBills(res.data.bills || []);
+      }
     } catch (e) {
       alert("Erro ao buscar faturamentos: " + (e.message || e));
     }
@@ -173,7 +186,24 @@ export default function SiengeImport() {
       {/* Filtros */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
         <h2 className="font-semibold text-sm text-foreground">Buscar faturamentos no Sienge</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+            <Label className="text-xs">Filtrar por contrato</Label>
+            <Select value={filterContractId} onValueChange={(v) => { setFilterContractId(v); setImportContractId(v); }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos os contratos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={null}>Todos (sem filtro)</SelectItem>
+                {contracts.filter(c => c.status === "active").map(c => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.project}
+                    {c.sienge_enterprise_ids?.length ? ` (${c.sienge_enterprise_ids.length} obra(s))` : " ⚠️ sem vínculo"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1">
             <Label className="text-xs">Data início (emissão)</Label>
             <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
@@ -185,10 +215,19 @@ export default function SiengeImport() {
           <div className="flex items-end">
             <Button onClick={loadBills} disabled={loadingBills} className="w-full gap-2">
               <Download className={`w-4 h-4 ${loadingBills ? "animate-bounce" : ""}`} />
-              {loadingBills ? "Buscando..." : "Buscar faturamentos"}
+              {loadingBills ? "Buscando..." : "Buscar"}
             </Button>
           </div>
         </div>
+        {filterContractId && (() => {
+          const c = contracts.find(x => x.id === filterContractId);
+          const ids = c?.sienge_enterprise_ids || [];
+          return ids.length > 0 ? (
+            <p className="text-xs text-green-600">✓ Filtro automático pelas obras: {ids.join(", ")}</p>
+          ) : (
+            <p className="text-xs text-amber-600">⚠️ Este contrato não tem centros de custo vinculados. Vá em Contratos → {c?.project} → aba "Vínculo Sienge" para configurar.</p>
+          );
+        })()}
       </div>
 
       {/* Lista de resultados */}

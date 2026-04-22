@@ -36,6 +36,13 @@
     "notes": {
       "type": "string",
       "description": "Observa\u00e7\u00f5es sobre o contrato"
+    },
+    "sienge_enterprise_ids": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "IDs das enterprises (centros de custo) vinculados no Sienge"
     }
   },
   "required": [

@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import AdditiveSection from "../components/contract/AdditiveSection";
 import BillingSection from "../components/contract/BillingSection";
 import BalanceSummary from "../components/contract/BalanceSummary";
+import SiengeLinkSection from "../components/contract/SiengeLinkSection";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,7 @@ export default function ContractDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [filterMonth, setFilterMonth] = useState("");
+  const [activeTab, setActiveTab] = useState("financeiro");
 
   const { data: contracts = [], isLoading: loadingContract } = useQuery({
     queryKey: ["contracts"],
@@ -165,20 +167,60 @@ export default function ContractDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <AdditiveSection contractId={contractId} additives={additives} billings={billings} />
-          <BillingSection contractId={contractId} billings={billings} additives={additives} filterMonth={filterMonth} onFilterMonthChange={setFilterMonth} />
-        </div>
-        <div>
-          <BalanceSummary
-            contract={contract}
-            additives={additives}
-            billings={filterMonth ? billings.filter((b) => b.month === filterMonth) : billings}
-            filterMonth={filterMonth}
-          />
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-border">
+        {[
+          { key: "financeiro", label: "Financeiro" },
+          { key: "sienge", label: "Vínculo Sienge" },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {activeTab === "financeiro" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <AdditiveSection contractId={contractId} additives={additives} billings={billings} />
+            <BillingSection contractId={contractId} billings={billings} additives={additives} filterMonth={filterMonth} onFilterMonthChange={setFilterMonth} />
+          </div>
+          <div>
+            <BalanceSummary
+              contract={contract}
+              additives={additives}
+              billings={filterMonth ? billings.filter((b) => b.month === filterMonth) : billings}
+              filterMonth={filterMonth}
+            />
+          </div>
+        </div>
+      )}
+
+      {activeTab === "sienge" && (
+        <div className="max-w-xl">
+          <div className="bg-card rounded-xl border border-border p-6 space-y-2">
+            <h2 className="font-semibold text-foreground">Centros de custo do Sienge</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Vincule os números das obras (enterprises) do Sienge a este contrato. Os faturamentos serão filtrados automaticamente ao importar.
+            </p>
+            <SiengeLinkSection
+              contract={contract}
+              onSave={async (enterpriseIds) => {
+                await base44.entities.Contract.update(contractId, { sienge_enterprise_ids: enterpriseIds });
+                queryClient.invalidateQueries({ queryKey: ["contracts"] });
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
