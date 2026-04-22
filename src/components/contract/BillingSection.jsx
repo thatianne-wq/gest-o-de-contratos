@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import SiengeImportDialog from "./SiengeImportDialog.jsx";
 
 const typeConfig = {
   medicao: { label: "Medição", className: "bg-blue-100 text-blue-700 border-blue-200" },
@@ -30,7 +31,7 @@ const typeConfig = {
 
 const emptyForm = { description: "", value: "", month: "", date: "", type: "medicao", is_sinal: false, origin: "contract", additive_id: "" };
 
-export default function BillingSection({ contractId, billings, additives = [], filterMonth = "", onFilterMonthChange }) {
+export default function BillingSection({ contractId, contract, billings, additives = [], filterMonth = "", onFilterMonthChange }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -86,169 +87,174 @@ export default function BillingSection({ contractId, billings, additives = [], f
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm">
-      <div className="flex items-center justify-between p-6 border-b border-border">
-        <div>
-          <h3 className="font-semibold text-foreground">Faturamento</h3>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <p className="text-xs text-muted-foreground">
-              Total: <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
-            </p>
-            <span className="text-xs text-muted-foreground">·</span>
-            <p className="text-xs text-muted-foreground">
-              Medição: <span className="font-semibold text-blue-600">{formatCurrency(totalMedicao)}</span>
-            </p>
-            <span className="text-xs text-muted-foreground">·</span>
-            <p className="text-xs text-muted-foreground">
-              FD: <span className="font-semibold text-purple-600">{formatCurrency(totalFD)}</span>
-            </p>
+      {/* Header */}
+      <div className="p-6 border-b border-border">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="font-semibold text-foreground">Faturamento</h3>
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <p className="text-xs text-muted-foreground">
+                Total: <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
+              </p>
+              <span className="text-xs text-muted-foreground">·</span>
+              <p className="text-xs text-muted-foreground">
+                Medição: <span className="font-semibold text-blue-600">{formatCurrency(totalMedicao)}</span>
+              </p>
+              <span className="text-xs text-muted-foreground">·</span>
+              <p className="text-xs text-muted-foreground">
+                FD: <span className="font-semibold text-purple-600">{formatCurrency(totalFD)}</span>
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {Object.keys(byMonth).length > 0 && (
-            <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger className="h-8 w-40 text-xs">
-                <Filter className="w-3 h-3 mr-1 text-muted-foreground" />
-                <SelectValue placeholder="Todos os meses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={null}>Todos os meses</SelectItem>
-                {allMonths.map((m) => (
-                  <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-2">
-              <Plus className="w-3.5 h-3.5" />
-              Faturamento
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo Faturamento</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
 
-              {/* Origem: Contrato ou Aditivo */}
-              <div className="space-y-2">
-                <Label>Origem *</Label>
-                <Select
-                  value={form.origin}
-                  onValueChange={(v) => setForm({ ...form, origin: v, additive_id: "" })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contract">Contrato Base</SelectItem>
-                    <SelectItem value="additive" disabled={additives.length === 0}>
-                      Aditivo {additives.length === 0 ? "(nenhum cadastrado)" : ""}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {allMonths.length > 0 && (
+              <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <SelectTrigger className="h-8 w-36 text-xs">
+                  <Filter className="w-3 h-3 mr-1 text-muted-foreground" />
+                  <SelectValue placeholder="Todos os meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={null}>Todos os meses</SelectItem>
+                  {allMonths.map((m) => (
+                    <SelectItem key={m} value={m}>{formatMonth(m)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-              {/* Se aditivo, selecionar qual */}
-              {form.origin === "additive" && (
-                <div className="space-y-2">
-                  <Label>Aditivo *</Label>
-                  <Select
-                    value={form.additive_id}
-                    onValueChange={(v) => setForm({ ...form, additive_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o aditivo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {additives.map((a, i) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.description || `Aditivo #${i + 1}`}
-                          {(a.value_empresa || a.value_fd) ? ` — ${formatCurrency((a.value_empresa || 0) + (a.value_fd || 0))}` : ""}
+            <SiengeImportDialog contract={contract} contractId={contractId} />
+
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2">
+                  <Plus className="w-3.5 h-3.5" />
+                  Faturamento
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Novo Faturamento</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Origem *</Label>
+                    <Select
+                      value={form.origin}
+                      onValueChange={(v) => setForm({ ...form, origin: v, additive_id: "" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="contract">Contrato Base</SelectItem>
+                        <SelectItem value="additive" disabled={additives.length === 0}>
+                          Aditivo {additives.length === 0 ? "(nenhum cadastrado)" : ""}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-2">
-                <Label>Tipo *</Label>
-                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="medicao">Medição</SelectItem>
-                    <SelectItem value="fd">FD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  {form.origin === "additive" && (
+                    <div className="space-y-2">
+                      <Label>Aditivo *</Label>
+                      <Select
+                        value={form.additive_id}
+                        onValueChange={(v) => setForm({ ...form, additive_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o aditivo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {additives.map((a, i) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.description || `Aditivo #${i + 1}`}
+                              {(a.value_empresa || a.value_fd) ? ` — ${formatCurrency((a.value_empresa || 0) + (a.value_fd || 0))}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-              <div className="space-y-2">
-                <Label>Descrição</Label>
-                <Input
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Descrição do faturamento"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Valor *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.value}
-                    onChange={(e) => setForm({ ...form, value: e.target.value })}
-                    placeholder="0,00"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Mês de Referência *</Label>
-                  <Input
-                    type="month"
-                    value={form.month}
-                    onChange={(e) => setForm({ ...form, month: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Data</Label>
-                <Input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is_sinal"
-                  checked={form.is_sinal}
-                  onCheckedChange={(checked) => setForm({ ...form, is_sinal: !!checked })}
-                />
-                <Label htmlFor="is_sinal" className="cursor-pointer">É Sinal?</Label>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending || (form.origin === "additive" && !form.additive_id)}
-                >
-                  {createMutation.isPending ? "Salvando..." : "Adicionar"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                  <div className="space-y-2">
+                    <Label>Tipo *</Label>
+                    <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="medicao">Medição</SelectItem>
+                        <SelectItem value="fd">FD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Descrição</Label>
+                    <Input
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      placeholder="Descrição do faturamento"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Valor *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={form.value}
+                        onChange={(e) => setForm({ ...form, value: e.target.value })}
+                        placeholder="0,00"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Mês de Referência *</Label>
+                      <Input
+                        type="month"
+                        value={form.month}
+                        onChange={(e) => setForm({ ...form, month: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data</Label>
+                    <Input
+                      type="date"
+                      value={form.date}
+                      onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="is_sinal"
+                      checked={form.is_sinal}
+                      onCheckedChange={(checked) => setForm({ ...form, is_sinal: !!checked })}
+                    />
+                    <Label htmlFor="is_sinal" className="cursor-pointer">É Sinal?</Label>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending || (form.origin === "additive" && !form.additive_id)}
+                    >
+                      {createMutation.isPending ? "Salvando..." : "Adicionar"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
+      {/* Lista de faturamentos */}
       <div>
         {sortedMonths.map((month) => {
           const monthTotal = byMonth[month].reduce((s, b) => s + (b.value || 0), 0);
