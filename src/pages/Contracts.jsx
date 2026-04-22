@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import ContractTable from "../components/dashboard/ContractTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { useAccessFilter } from "@/hooks/useAccessFilter";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Contracts() {
   const [search, setSearch] = useState("");
@@ -27,7 +29,10 @@ export default function Contracts() {
     queryFn: () => base44.entities.Billing.list(),
   });
 
-  const filtered = contracts.filter(
+  const { allowedContracts } = useAccessFilter(contracts);
+  const { can, isAdmin } = usePermissions();
+
+  const filtered = allowedContracts.filter(
     (c) =>
       c.project?.toLowerCase().includes(search.toLowerCase()) ||
       c.client?.toLowerCase().includes(search.toLowerCase())
@@ -48,24 +53,28 @@ export default function Contracts() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contratos</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {contracts.length} contratos cadastrados
+            {filtered.length} contratos
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => exportBacklogToExcel(contracts, additives, billings)}
-          >
-            <Download className="w-4 h-4" />
-            Exportar Excel
-          </Button>
-          <Link to="/contracts/new">
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Novo Contrato
+          {(isAdmin || can("contracts", "export")) && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => exportBacklogToExcel(allowedContracts, additives, billings)}
+            >
+              <Download className="w-4 h-4" />
+              Exportar Excel
             </Button>
-          </Link>
+          )}
+          {(isAdmin || can("contracts", "create")) && (
+            <Link to="/contracts/new">
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Novo Contrato
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
