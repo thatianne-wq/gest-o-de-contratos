@@ -13,6 +13,7 @@ import NewContract from './pages/NewContract';
 import ContractDetail from './pages/ContractDetail';
 import EditContract from './pages/EditContract';
 import UserManagement from './pages/UserManagement';
+import SiengeImport from './pages/SiengeImport';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -43,6 +44,7 @@ const AuthenticatedApp = () => {
         <Route path="/contracts/:id" element={<ContractDetail />} />
         <Route path="/contracts/:id/edit" element={<EditContract />} />
         <Route path="/users" element={<UserManagement />} />
+        <Route path="/sienge" element={<SiengeImport />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
