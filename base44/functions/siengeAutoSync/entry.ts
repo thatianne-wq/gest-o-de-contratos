@@ -49,6 +49,29 @@ async function fetchAllPages(path, params = {}) {
   return all;
 }
 
+// Verifica se a nota do título menciona algum dos enterpriseIds do contrato
+function billMatchesContract(bill, enterpriseIds) {
+  const note = (bill.note || "").toLowerCase();
+  return enterpriseIds.some((id) => {
+    // Padrão: "obra 248", "obra: 248", "obra248", etc.
+    const pattern = new RegExp(`\\b(?:obra|empreendimento|cc)[\\s:/#-]*0*${id}\\b`);
+    return pattern.test(note);
+  });
+}
+
+// Determina o tipo do faturamento pelo documentId
+function getBillingType(bill) {
+  const docId = (bill.documentId || "").trim().toUpperCase();
+  const note = (bill.note || "").toLowerCase();
+  if (docId === "RFD" || note.includes("faturamento direto") || note.includes(" rfd")) return "fd";
+  return "medicao";
+}
+
+function getIsSinal(bill) {
+  const note = (bill.note || "").toLowerCase();
+  return note.includes("sinal") || note.includes("adiantamento");
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -63,16 +86,17 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, message: "Nenhum contrato com enterprises vinculadas." });
     }
 
-    // Busca todos os títulos a receber do Sienge (últimos 90 dias)
-    const endDate = new Date().toISOString().split("T")[0];
-    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const allBills = await fetchAllPages("accounts-receivable/receivable-bills", {
-      startIssueDate: startDate,
-      endIssueDate: endDate,
-    });
+    // Busca todos os títulos a receber do Sienge (paginado)
+    const allBills = await fetchAllPages("accounts-receivable/receivable-bills");
 
-    // Busca billings já importados para evitar duplicatas (pelo campo description+month)
+    // Busca billings já existentes para checar duplicatas pelo receivableBillId
     const existingBillings = await base44.asServiceRole.entities.Billing.list();
+    // Guarda os IDs do Sienge já importados (salvos no campo description como referência)
+    const existingBillIds = new Set(
+      existingBillings
+        .map((b) => b.sienge_bill_id)
+        .filter(Boolean)
+    );
 
     let totalImported = 0;
     const results = [];
@@ -80,53 +104,32 @@ Deno.serve(async (req) => {
     for (const contract of contracts) {
       const enterpriseIds = contract.sienge_enterprise_ids;
 
-      // Filtra bills que pertencem a algum dos enterprises do contrato
-      const matched = allBills.filter((bill) => {
-        const billEnterpriseId = bill.enterpriseId || bill.buildingId || bill.enterprise?.id;
-        if (billEnterpriseId) {
-          return enterpriseIds.includes(billEnterpriseId);
-        }
-        // fallback: busca por nota
-        const note = (bill.note || "").toLowerCase();
-        return enterpriseIds.some((id) => {
-          const pattern = new RegExp(`\\b(obra|empreendimento|cc)\\s*[:#-]?\\s*0*${id}\\b`);
-          return pattern.test(note);
-        });
-      });
+      // Filtra bills que pertencem às enterprises do contrato
+      const matched = allBills.filter((bill) => billMatchesContract(bill, enterpriseIds));
 
       let imported = 0;
       for (const bill of matched) {
+        // Evita duplicatas pelo ID único do Sienge
+        if (existingBillIds.has(bill.receivableBillId)) continue;
+
         const issueDate = bill.issueDate;
         const month = issueDate ? issueDate.substring(0, 7) : "";
-        const note = bill.note || "";
-        const docId = (bill.documentId || "").trim().toUpperCase();
-        const isFD = note.toLowerCase().includes("faturamento direto") || docId === "RFD" || docId === "FD";
-        const isSinal = note.toLowerCase().includes("sinal") || note.toLowerCase().includes("adiantamento");
-        const value = bill.receivableBillValue || 0;
-        const description = note.substring(0, 250);
+        const note = (bill.note || "").substring(0, 250);
 
-        // Verifica duplicata: mesmo contrato, mesmo mês, mesma descrição e valor
-        const isDuplicate = existingBillings.some(
-          (b) =>
-            b.contract_id === contract.id &&
-            b.month === month &&
-            b.description === description &&
-            b.value === value
-        );
+        await base44.asServiceRole.entities.Billing.create({
+          contract_id: contract.id,
+          type: getBillingType(bill),
+          is_sinal: getIsSinal(bill),
+          description: note || `NF ${bill.documentNumber || bill.receivableBillId}`,
+          value: bill.receivableBillValue || 0,
+          month,
+          date: issueDate,
+          sienge_bill_id: bill.receivableBillId,
+        });
 
-        if (!isDuplicate) {
-          await base44.asServiceRole.entities.Billing.create({
-            contract_id: contract.id,
-            type: isFD ? "fd" : "medicao",
-            is_sinal: isSinal,
-            description,
-            value,
-            month,
-            date: issueDate,
-          });
-          imported++;
-          totalImported++;
-        }
+        existingBillIds.add(bill.receivableBillId);
+        imported++;
+        totalImported++;
       }
 
       results.push({ contract: contract.project, matched: matched.length, imported });
@@ -135,6 +138,7 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       contracts_processed: contracts.length,
+      total_bills_in_sienge: allBills.length,
       total_imported: totalImported,
       results,
     });

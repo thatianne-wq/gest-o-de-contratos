@@ -40,6 +40,10 @@
       "type": "string",
       "format": "date",
       "description": "Data do faturamento"
+    },
+    "sienge_bill_id": {
+      "type": "number",
+      "description": "ID do t\u00edtulo no Sienge (evita duplicatas na importa\u00e7\u00e3o autom\u00e1tica)"
     }
   },
   "required": [
