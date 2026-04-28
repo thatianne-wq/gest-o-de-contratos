@@ -223,6 +223,58 @@ Deno.serve(async (req) => {
       return Response.json(data);
     }
 
+    // ─── DESCOBERTA DE ENDPOINTS (debug) ──────────────────────────────
+    if (action === "discover_endpoints") {
+      const enterpriseId = body.enterpriseId || 714;
+      const subdomain = getSubdomain();
+
+      // Testa múltiplas versões de API e paths
+      const candidates = [];
+      const versions = ["v1", "v2", "v3"];
+      const paths = [
+        `enterprises/${enterpriseId}/cost-by-levels`,
+        `enterprises/${enterpriseId}/cost-by-level`,
+        `enterprises/${enterpriseId}/construction-budget`,
+        `enterprises/${enterpriseId}/budget`,
+        `enterprises/${enterpriseId}/budget-levels`,
+        `enterprises/${enterpriseId}/analytic-appropriations`,
+        `enterprises/${enterpriseId}/appropriations-analytic`,
+        `enterprises/${enterpriseId}/distortions`,
+        `enterprises/${enterpriseId}/physical-financial`,
+        `enterprises/${enterpriseId}/cost-management`,
+        `construction-budget/enterprises/${enterpriseId}`,
+        `budget/enterprises/${enterpriseId}`,
+        `cost-by-levels`,
+        `cost-by-level`,
+        `construction-budgets`,
+        `enterprises/${enterpriseId}/building-costs`,
+        `enterprises/${enterpriseId}/cost-estimations`,
+        `cost-estimations`,
+        `enterprises/${enterpriseId}/cost-estimation`,
+        `enterprises/${enterpriseId}/budget-forecast`,
+      ];
+
+      for (const version of versions) {
+        for (const p of paths.slice(0, 8)) { // limita para não timeout
+          const fullPath = `https://api.sienge.com.br/${subdomain}/public/api/${version}/${p}`;
+          try {
+            const res = await fetch(fullPath, {
+              headers: { Authorization: getAuthHeader(), Accept: "application/json" }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              candidates.push({ path: `${version}/${p}`, status: "OK", keys: Object.keys(data).slice(0, 5) });
+            } else {
+              candidates.push({ path: `${version}/${p}`, status: res.status });
+            }
+          } catch (e) {
+            candidates.push({ path: `${version}/${p}`, status: "ERR" });
+          }
+        }
+      }
+      return Response.json({ candidates });
+    }
+
     // ─── BUSCAR CENTROS DE CUSTO ──────────────────────────────────────
     if (action === "get_cost_centers") {
       const data = await fetchAllPages("enterprises");
