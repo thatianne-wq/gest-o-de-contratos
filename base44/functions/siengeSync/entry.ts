@@ -21,6 +21,25 @@ function getAuthHeader() {
   return `Basic ${credentials}`;
 }
 
+async function siengeGetV2(path, params = {}) {
+  const subdomain = getSubdomain();
+  const url = new URL(`https://api.sienge.com.br/${subdomain}/public/api/v2/${path}`);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) url.searchParams.set(k, v);
+  }
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: getAuthHeader(),
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Sienge v2 ${res.status}: ${text.substring(0, 200)}`);
+  }
+  return res.json();
+}
+
 async function siengeGet(path, params = {}) {
   const subdomain = getSubdomain();
   const url = new URL(`https://api.sienge.com.br/${subdomain}/public/api/v1/${path}`);
@@ -275,6 +294,30 @@ Deno.serve(async (req) => {
       return Response.json({ candidates });
     }
 
+    // ─── DESCOBERTA V2 ────────────────────────────────────────────────
+    if (action === "discover_endpoints_v2") {
+      const subdomain = getSubdomain();
+      const paths = body.paths || [];
+      const candidates = [];
+      for (const p of paths) {
+        const fullPath = `https://api.sienge.com.br/${subdomain}/public/api/v2/${p}?limit=1`;
+        try {
+          const res = await fetch(fullPath, {
+            headers: { Authorization: getAuthHeader(), Accept: "application/json" }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            candidates.push({ path: `v2/${p}`, status: "OK", keys: Object.keys(data).slice(0, 8) });
+          } else {
+            candidates.push({ path: `v2/${p}`, status: res.status });
+          }
+        } catch (e) {
+          candidates.push({ path: `v2/${p}`, status: "ERR" });
+        }
+      }
+      return Response.json({ candidates });
+    }
+
     // ─── BUSCAR CENTROS DE CUSTO ──────────────────────────────────────
     if (action === "get_cost_centers") {
       const data = await fetchAllPages("enterprises");
@@ -286,6 +329,51 @@ Deno.serve(async (req) => {
           code: e.code || e.id,
         }))
       });
+    }
+
+    // ─── TESTAR URL EXATA (debug) ────────────────────────────────────────
+    if (action === "test_exact_url") {
+      const subdomain = getSubdomain();
+      const { urls } = body;
+      const results = [];
+      for (const urlPath of (urls || [])) {
+        const fullUrl = urlPath.startsWith("http") ? urlPath : `https://api.sienge.com.br/${subdomain}/public/api/${urlPath}`;
+        const res = await fetch(fullUrl, {
+          headers: { Authorization: getAuthHeader(), Accept: "application/json" }
+        });
+        let preview = null;
+        if (res.ok) {
+          const txt = await res.text();
+          try { preview = JSON.parse(txt.substring(0, 500)); } catch { preview = txt.substring(0, 300); }
+        }
+        results.push({ url: fullUrl, status: res.status, preview });
+      }
+      return Response.json({ results });
+    }
+
+    // ─── LISTAR TODOS OS ENDPOINTS DISPONÍVEIS (swagger) ─────────────────
+    if (action === "list_all_endpoints") {
+      const subdomain = getSubdomain();
+      // Tentar múltiplos caminhos de swagger/api-docs
+      const swaggerPaths = [
+        `https://api.sienge.com.br/${subdomain}/public/api/v1/swagger.json`,
+        `https://api.sienge.com.br/${subdomain}/public/api/swagger.json`,
+        `https://api.sienge.com.br/docs/swagger.json`,
+        `https://api.sienge.com.br/${subdomain}/public/api/v1/v2/api-docs`,
+        `https://api.sienge.com.br/${subdomain}/public/api/v2/swagger.json`,
+      ];
+      const results = [];
+      for (const url of swaggerPaths) {
+        const r = await fetch(url, { headers: { Authorization: getAuthHeader(), Accept: "application/json" } });
+        results.push({ url, status: r.status });
+        if (r.ok) {
+          const data = await r.json();
+          const paths = Object.keys(data.paths || {});
+          const relevant = paths.filter(p => /building|cost|constructive|unit|engineering|budget|spreadsheet|level/i.test(p));
+          return Response.json({ source: url, total_paths: paths.length, relevant_paths: relevant });
+        }
+      }
+      return Response.json({ tried: results });
     }
 
     return Response.json({ error: "Ação inválida" }, { status: 400 });
