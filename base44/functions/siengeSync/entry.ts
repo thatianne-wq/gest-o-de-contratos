@@ -228,48 +228,48 @@ Deno.serve(async (req) => {
       const enterpriseId = body.enterpriseId || 714;
       const subdomain = getSubdomain();
 
-      // Testa múltiplas versões de API e paths
       const candidates = [];
-      const versions = ["v1", "v2", "v3"];
-      const paths = [
-        `enterprises/${enterpriseId}/cost-by-levels`,
-        `enterprises/${enterpriseId}/cost-by-level`,
-        `enterprises/${enterpriseId}/construction-budget`,
-        `enterprises/${enterpriseId}/budget`,
-        `enterprises/${enterpriseId}/budget-levels`,
-        `enterprises/${enterpriseId}/analytic-appropriations`,
-        `enterprises/${enterpriseId}/appropriations-analytic`,
-        `enterprises/${enterpriseId}/distortions`,
-        `enterprises/${enterpriseId}/physical-financial`,
-        `enterprises/${enterpriseId}/cost-management`,
-        `construction-budget/enterprises/${enterpriseId}`,
-        `budget/enterprises/${enterpriseId}`,
-        `cost-by-levels`,
-        `cost-by-level`,
-        `construction-budgets`,
-        `enterprises/${enterpriseId}/building-costs`,
-        `enterprises/${enterpriseId}/cost-estimations`,
-        `cost-estimations`,
-        `enterprises/${enterpriseId}/cost-estimation`,
-        `enterprises/${enterpriseId}/budget-forecast`,
+      const paths = body.paths || [
+        // Engenharia / Orçamento
+        `enterprises/${enterpriseId}/building-cost-databases`,
+        `enterprises/${enterpriseId}/building-budgets`,
+        `enterprises/${enterpriseId}/spreadsheets`,
+        `enterprises/${enterpriseId}/construction-spreadsheets`,
+        `spreadsheets`,
+        `building-spreadsheets`,
+        `building-budgets`,
+        `building-cost-databases`,
+        // Plano Financeiro / Comprometido
+        `enterprises/${enterpriseId}/financial-plans`,
+        `enterprises/${enterpriseId}/cost-appropriation`,
+        `enterprises/${enterpriseId}/cost-appropriations`,
+        `appropriations`,
+        `cost-appropriations`,
+        // Contas a Pagar
+        `bills-to-pay`,
+        `payable-documents`,
+        `enterprises/${enterpriseId}/payable-bills`,
+        `construction-payable-bills`,
+        // Outros
+        `enterprises/${enterpriseId}/work-orders`,
+        `enterprises/${enterpriseId}/contracts`,
+        `enterprises/${enterpriseId}/resources`,
       ];
 
-      for (const version of versions) {
-        for (const p of paths.slice(0, 8)) { // limita para não timeout
-          const fullPath = `https://api.sienge.com.br/${subdomain}/public/api/${version}/${p}`;
-          try {
-            const res = await fetch(fullPath, {
-              headers: { Authorization: getAuthHeader(), Accept: "application/json" }
-            });
-            if (res.ok) {
-              const data = await res.json();
-              candidates.push({ path: `${version}/${p}`, status: "OK", keys: Object.keys(data).slice(0, 5) });
-            } else {
-              candidates.push({ path: `${version}/${p}`, status: res.status });
-            }
-          } catch (e) {
-            candidates.push({ path: `${version}/${p}`, status: "ERR" });
+      for (const p of paths) {
+        const fullPath = `https://api.sienge.com.br/${subdomain}/public/api/v1/${p}?limit=1`;
+        try {
+          const res = await fetch(fullPath, {
+            headers: { Authorization: getAuthHeader(), Accept: "application/json" }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            candidates.push({ path: `v1/${p}`, status: "OK", keys: Object.keys(data).slice(0, 6) });
+          } else {
+            candidates.push({ path: `v1/${p}`, status: res.status });
           }
+        } catch (e) {
+          candidates.push({ path: `v1/${p}`, status: "ERR" });
         }
       }
       return Response.json({ candidates });
