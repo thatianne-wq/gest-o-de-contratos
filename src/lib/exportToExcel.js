@@ -305,6 +305,9 @@ function buildDashboardSheet(enriched, contracts, billings) {
     { hpt: 18 }, { hpt: 22 },               // cabeçalho % exec + linha
   ];
 
+  // Range obrigatório: sheets montados manualmente não derivam !ref, sem isso o Excel mostra a aba vazia
+  ws["!ref"] = `A1:H${r}`;
+
   return ws;
 }
 
