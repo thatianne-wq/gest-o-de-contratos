@@ -15,6 +15,9 @@ const C = {
   text: "111827",
   muted: "6B7280",
   border: "D1D5DB",
+  iconTop: "F39233",
+  iconBottom: "EF8200",
+  brandText: "58595B",
 };
 
 const FMT_BRL = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
@@ -57,6 +60,22 @@ function setCell(ws, addr, value, opts = {}) {
 function merge(ws, range) {
   ws["!merges"] = ws["!merges"] || [];
   ws["!merges"].push(XLSX.utils.decode_range(range));
+}
+
+// Bloco de marca no canto superior esquerdo (linhas 1-2): ícone laranja + RETROFIT ENGENHARIA
+function addBrandBand(ws, lastColLetter) {
+  merge(ws, "A1:B1");
+  setCell(ws, "A1", "", { fill: C.iconTop, noborder: true });
+  merge(ws, `C1:${lastColLetter}1`);
+  setCell(ws, "C1", "RETROFIT", {
+    color: C.brandText, sz: 22, bold: true, halign: "left", noborder: true, valign: "center",
+  });
+  merge(ws, "A2:B2");
+  setCell(ws, "A2", "", { fill: C.iconBottom, noborder: true });
+  merge(ws, `C2:${lastColLetter}2`);
+  setCell(ws, "C2", "ENGENHARIA", {
+    color: C.brandText, sz: 11, halign: "left", noborder: true, valign: "top",
+  });
 }
 
 const MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -105,27 +124,30 @@ function buildDashboardSheet(enriched, contracts, billings) {
   const activeCount = contracts.filter((c) => c.status === "active").length;
   const today = new Date().toLocaleDateString("pt-BR");
 
-  // ----- Título -----
-  merge(ws, "A1:H1");
-  setCell(ws, A(0, 0), "RELATÓRIO DE BACKLOG — CONTRATOS", {
+  // ----- Logo / Marca (linhas 1-2) -----
+  addBrandBand(ws, "H");
+
+  // ----- Título (linha 4) -----
+  merge(ws, "A4:H4");
+  setCell(ws, A(3, 0), "RELATÓRIO DE BACKLOG — CONTRATOS", {
     fill: C.navy, color: C.white, bold: true, sz: 16, halign: "center", valign: "center", noborder: true,
   });
-  merge(ws, "A2:H2");
-  setCell(ws, A(1, 0), `Retrofit Engenharia  ·  Gerado em ${today}`, {
+  merge(ws, "A5:H5");
+  setCell(ws, A(4, 0), `Gerado em ${today}`, {
     fill: C.navySoft, color: C.white, italic: true, sz: 10, halign: "center", noborder: true,
   });
 
-  // ----- KPIs (linha 4	labels, linha 5 valores) -----
-  merge(ws, "A4:H4");
-  setCell(ws, A(3, 0), "INDICADORES PRINCIPAIS", {
+  // ----- KPIs (linha 7 labels, linha 8 valores) -----
+  merge(ws, "A7:H7");
+  setCell(ws, A(6, 0), "INDICADORES PRINCIPAIS", {
     fill: C.orange, color: C.white, bold: true, sz: 11, halign: "left",
   });
 
   const kpis = [
-    { span: "A5:B5", vspan: "A6:B6", label: "Contratos Ativos", value: activeCount, fmt: FMT_INT },
-    { span: "C5:D5", vspan: "C6:D6", label: "Valor Contratado", value: totalContracted, fmt: FMT_BRL },
-    { span: "E5:F5", vspan: "E6:F6", label: "Total Faturado", value: totalBilled, fmt: FMT_BRL },
-    { span: "G5:H5", vspan: "G6:H6", label: "Saldo Backlog", value: totalBalance, fmt: FMT_BRL },
+    { span: "A8:B8", vspan: "A9:B9", label: "Contratos Ativos", value: activeCount, fmt: FMT_INT },
+    { span: "C8:D8", vspan: "C9:D9", label: "Valor Contratado", value: totalContracted, fmt: FMT_BRL },
+    { span: "E8:F8", vspan: "E9:F9", label: "Total Faturado", value: totalBilled, fmt: FMT_BRL },
+    { span: "G8:H8", vspan: "G9:H9", label: "Saldo Backlog", value: totalBalance, fmt: FMT_BRL },
   ];
   kpis.forEach((k) => {
     merge(ws, k.span);
@@ -141,23 +163,23 @@ function buildDashboardSheet(enriched, contracts, billings) {
   });
 
   // ----- Linha de KPIs secundários (%.Execução) -----
-  merge(ws, "A8:H8");
-  setCell(ws, A(7, 0), "% DE EXECUÇÃO", {
+  merge(ws, "A11:H11");
+  setCell(ws, A(10, 0), "% DE EXECUÇÃO", {
     fill: C.orangeSoft, color: C.text, bold: true, sz: 10, halign: "left",
   });
-  merge(ws, "A9:D9");
-  setCell(ws, A(8, 0), "Faturado / Contratado", {
+  merge(ws, "A12:D12");
+  setCell(ws, A(11, 0), "Faturado / Contratado", {
     fill: C.white, color: C.muted, sz: 9, halign: "right", bold: true,
   });
-  merge(ws, "E9:H9");
-  setCell(ws, A(8, 4), pctExec, {
+  merge(ws, "E12:H12");
+  setCell(ws, A(11, 4), pctExec, {
     fill: pctExec >= 0.5 ? C.greenSoft : C.orangeSoft,
     color: pctExec >= 0.5 ? C.green : C.orange,
     bold: true, sz: 16, halign: "center", t: "n", z: FMT_PCT,
   });
 
   // ----- TOP 5 CONTRATOS -----
-  let r = 10;
+  let r = 13;
   merge(ws, `A${r + 1}:H${r + 1}`);
   setCell(ws, A(r, 0), "TOP 5 CONTRATOS POR VALOR CONTRATADO", {
     fill: C.navy, color: C.white, bold: true, sz: 11, halign: "left",
@@ -274,19 +296,30 @@ function buildDashboardSheet(enriched, contracts, billings) {
 
   // Larguras e alturas
   ws["!cols"] = [22, 24, 18, 16, 16, 14, 12, 16].map((w) => ({ wch: w }));
-  ws["!rows"] = [{ hpt: 30 }, { hpt: 20 }, { hpt: 6 }, {}, { hpt: 18 }, { hpt: 28 }];
+  ws["!rows"] = [
+    { hpt: 20 }, { hpt: 18 }, { hpt: 6 },   // marca + espaçador
+    { hpt: 30 }, { hpt: 20 },               // título + subtítulo
+    { hpt: 6 },                              // espaçador
+    { hpt: 18 }, { hpt: 16 }, { hpt: 28 },  // cabeçalho KPI + rótulo + valor
+    {},                                      // espaçador
+    { hpt: 18 }, { hpt: 22 },               // cabeçalho % exec + linha
+  ];
 
   return ws;
 }
 
 // ============= SHEETS DE DADOS =============
 function styleDataSheet(headers, rows, numCols, moneyCols, dateCols = [], pctCols = []) {
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  // Marca nas linhas 1-2 + espaçador na 3; cabeçalho na linha 4, dados a seguir
+  const ws = XLSX.utils.aoa_to_sheet([[""], [""], [""], headers, ...rows]);
   const range = XLSX.utils.decode_range(ws["!ref"]);
+  const lastColLetter = XLSX.utils.encode_cell({ r: 0, c: headers.length - 1 }).replace(/\d+/, "");
 
-  // Header row
+  addBrandBand(ws, lastColLetter);
+
+  // Cabeçalho (índice 3)
   for (let c = range.s.c; c <= range.e.c; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    const addr = XLSX.utils.encode_cell({ r: 3, c });
     if (ws[addr]) {
       ws[addr].s = {
         font: { name: "Calibri", sz: 10, bold: true, color: { rgb: C.white } },
@@ -298,9 +331,9 @@ function styleDataSheet(headers, rows, numCols, moneyCols, dateCols = [], pctCol
     }
   }
 
-  // Body rows
-  for (let r = 1; r <= range.e.r; r++) {
-    const zebra = (r - 1) % 2 ? C.graySoft : C.white;
+  // Corpo (a partir do índice 4)
+  for (let r = 4; r <= range.e.r; r++) {
+    const zebra = (r - 4) % 2 ? C.graySoft : C.white;
     for (let c = range.s.c; c <= range.e.c; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       if (!ws[addr]) continue;
@@ -324,7 +357,7 @@ function styleDataSheet(headers, rows, numCols, moneyCols, dateCols = [], pctCol
     }
   }
 
-  ws["!rows"] = [{ hpt: 22 }];
+  ws["!rows"] = [{ hpt: 20 }, { hpt: 18 }, { hpt: 6 }, { hpt: 22 }];
   return ws;
 }
 
