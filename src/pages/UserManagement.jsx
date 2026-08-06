@@ -30,18 +30,33 @@ export default function UserManagement() {
   });
 
   const createAccessMutation = useMutation({
-    mutationFn: (email) =>
-      base44.entities.UserAccess.create({
+    mutationFn: async (email) => {
+      // 1. Convida o usuário para o workspace (sem isso, não consegue logar)
+      try {
+        await base44.users.inviteUser(email.trim().toLowerCase(), "user");
+      } catch (err) {
+        // Ignora se já for membro do workspace
+        const msg = (err?.message || "").toLowerCase();
+        if (!msg.includes("already") && !msg.includes("exist") && !msg.includes("membro")) {
+          throw err;
+        }
+      }
+      // 2. Cria o registro de permissões internas do app
+      return base44.entities.UserAccess.create({
         user_email: email.trim().toLowerCase(),
         is_active: true,
         is_admin: false,
         allowed_contract_ids: [],
         editable_contract_ids: [],
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["useraccesses"] });
       setNewEmail("");
       setAddingUser(false);
+    },
+    onError: (err) => {
+      alert("Erro ao cadastrar usuário: " + (err?.message || "tente novamente"));
     },
   });
 
