@@ -20,6 +20,7 @@ import {
 
 export default function Dashboard() {
   const [filterProject, setFilterProject] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const { data: contracts = [], isLoading: loadingContracts } = useQuery({
     queryKey: ["contracts"],
@@ -109,10 +110,21 @@ export default function Dashboard() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => exportBacklogToExcel(contracts, additives, billings)}
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true);
+              try {
+                await exportBacklogToExcel(contracts, additives, billings);
+              } catch (e) {
+                console.error(e);
+                alert("Falha ao gerar o Excel: " + (e?.message || "erro desconhecido"));
+              } finally {
+                setExporting(false);
+              }
+            }}
           >
             <Download className="w-4 h-4" />
-            Exportar Excel
+            {exporting ? "Gerando..." : "Exportar Excel"}
           </Button>
         </div>
       </div>

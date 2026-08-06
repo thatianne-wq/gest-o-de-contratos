@@ -1,88 +1,35 @@
-import * as XLSX from "xlsx-js-style";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import { getBrandImageBuffer } from "@/lib/fetchBrandImage";
 
-// Paleta corporativa
+// ---------- Paleta corporativa (ARGB com prefixo FF) ----------
 const C = {
-  navy: "1F2937",
-  navySoft: "374151",
-  orange: "F59E0B",
-  orangeSoft: "FEF3C7",
-  green: "10B981",
-  greenSoft: "D1FAE5",
-  red: "EF4444",
-  redSoft: "FEE2E2",
-  graySoft: "F3F4F6",
-  white: "FFFFFF",
-  text: "111827",
-  muted: "6B7280",
-  border: "D1D5DB",
-  iconTop: "F39233",
-  iconBottom: "EF8200",
-  brandText: "58595B",
+  navy: "FF1F2937",
+  navySoft: "FF374151",
+  orange: "FFF59E0B",
+  orangeSoft: "FFFEF3C7",
+  green: "FF10B981",
+  greenSoft: "FFD1FAE5",
+  red: "FFEF4444",
+  redSoft: "FFFEE2E2",
+  graySoft: "FFF3F4F6",
+  white: "FFFFFFFF",
+  text: "FF111827",
+  muted: "FF6B7280",
+  border: "FFD1D5DB",
+  brandText: "FF58595B",
 };
 
 const FMT_BRL = '"R$" #,##0.00;[Red]-"R$" #,##0.00';
 const FMT_PCT = "0.0%";
 const FMT_INT = "#,##0";
-
-const BORDER = {
-  top: { style: "thin", color: { rgb: C.border } },
-  bottom: { style: "thin", color: { rgb: C.border } },
-  left: { style: "thin", color: { rgb: C.border } },
-  right: { style: "thin", color: { rgb: C.border } },
-};
-
-const A = (r, c) => XLSX.utils.encode_cell({ r, c });
-
-function setCell(ws, addr, value, opts = {}) {
-  ws[addr] = {
-    t: opts.t || (typeof value === "number" ? "n" : "s"),
-    v: value,
-    z: opts.z,
-    s: {
-      font: {
-        name: "Calibri",
-        sz: opts.sz || 10,
-        color: { rgb: opts.color || C.text },
-        bold: !!opts.bold,
-        italic: !!opts.italic,
-      },
-      fill: opts.fill ? { patternType: "solid", fgColor: { rgb: opts.fill } } : undefined,
-      alignment: {
-        vertical: opts.valign || "center",
-        horizontal: opts.halign || "left",
-        wrapText: !!opts.wrap,
-      },
-      border: opts.noborder ? undefined : BORDER,
-    },
-  };
-}
-
-function merge(ws, range) {
-  ws["!merges"] = ws["!merges"] || [];
-  ws["!merges"].push(XLSX.utils.decode_range(range));
-}
-
-// Bloco de marca no canto superior esquerdo (linhas 1-2): ícone laranja + RETROFIT ENGENHARIA
-function addBrandBand(ws, lastColLetter) {
-  merge(ws, "A1:B1");
-  setCell(ws, "A1", "", { fill: C.iconTop, noborder: true });
-  merge(ws, `C1:${lastColLetter}1`);
-  setCell(ws, "C1", "RETROFIT", {
-    color: C.brandText, sz: 22, bold: true, halign: "left", noborder: true, valign: "center",
-  });
-  merge(ws, "A2:B2");
-  setCell(ws, "A2", "", { fill: C.iconBottom, noborder: true });
-  merge(ws, `C2:${lastColLetter}2`);
-  setCell(ws, "C2", "ENGENHARIA", {
-    color: C.brandText, sz: 11, halign: "left", noborder: true, valign: "top",
-  });
-}
+const FMT_DATE = "dd/mm/yyyy";
 
 const MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const fmtMonth = (m) => {
   if (!m) return "";
-  const [y, mo] = m.split("-");
-  return `${MONTHS_PT[parseInt(mo) - 1]}/${y}`;
+  const [y, mo] = String(m).split("-");
+  return `${MONTHS_PT[parseInt(mo, 10) - 1]}/${y}`;
 };
 const STATUS_LABEL = { active: "Ativo", completed: "Concluído", cancelled: "Cancelado" };
 const STATUS_COLOR = {
@@ -91,6 +38,70 @@ const STATUS_COLOR = {
   cancelled: { fill: C.redSoft, color: C.red },
 };
 
+function thinBorder(color = C.border) {
+  const edge = { style: "thin", color: { argb: color } };
+  return { top: edge, bottom: edge, left: edge, right: edge };
+}
+
+// Estiliza/acrescenta uma célula com valor, fonte, preenchimento, alinhamento e borda.
+function put(ws, addr, value, opts = {}) {
+  const cell = ws.getCell(addr);
+  if (value !== undefined) cell.value = value;
+  if (opts.numFmt) cell.numFmt = opts.numFmt;
+  cell.font = {
+    name: "Calibri",
+    size: opts.size || 10,
+    bold: !!opts.bold,
+    italic: !!opts.italic,
+    color: { argb: opts.color || C.text },
+  };
+  if (opts.fill) {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: opts.fill } };
+  }
+  cell.alignment = {
+    vertical: opts.valign || "middle",
+    horizontal: opts.halign || "left",
+    wrapText: !!opts.wrap,
+  };
+  if (!opts.noborder) cell.border = thinBorder(opts.borderColor);
+  return cell;
+}
+
+// Embute a logo em A1 (altura ~2 linhas) + texto "RETROFIT ENGENHARIA" à direita.
+function addBrand(workbook, ws, lastColLetter) {
+  const imgId = workbook.addImage({
+    buffer: getBrandImageBufferCached(),
+    extension: "png",
+  });
+  // âncora flutuante: canto superior esquerdo, ~165x50 px (cabe em 2 linhas ~28+28)
+  ws.addImage(imgId, {
+    tl: { col: 0, row: 0 },
+    ext: { width: 165, height: 50 },
+  });
+
+  ws.mergeCells(`C1:${lastColLetter}1`);
+  put(ws, "C1", "RETROFIT", {
+    color: C.brandText, size: 22, bold: true, halign: "left", noborder: true, valign: "bottom",
+  });
+  ws.mergeCells(`C2:${lastColLetter}2`);
+  put(ws, "C2", "ENGENHARIA", {
+    color: C.brandText, size: 11, halign: "left", noborder: true, valign: "top",
+  });
+  // A1:B2 ficam sob a imagem — mantemos sem borda
+  ["A1", "B1", "A2", "B2"].forEach((a) => put(ws, a, null, { noborder: true }));
+
+  ws.getRow(1).height = 28;
+  ws.getRow(2).height = 24;
+  ws.getRow(3).height = 6; // espaçador
+}
+
+// Cache do buffer é populado antes de criar o workbook (ver exportBacklogToExcel).
+let _brandBuffer = null;
+function getBrandImageBufferCached() {
+  return _brandBuffer;
+}
+
+// ---------- Enriquecimento de contratos ----------
 function enrichContract(c, additives, billings) {
   const cAdds = additives.filter((a) => a.contract_id === c.id);
   const cBills = billings.filter((b) => b.contract_id === c.id);
@@ -103,17 +114,18 @@ function enrichContract(c, additives, billings) {
   const total = initial + add;
   const billed = cBills.reduce((s, b) => s + (b.value || 0), 0);
   return {
-    c,
-    initialE, initialF, initial, addE, addF, add, total, billed,
+    c, initialE, initialF, initial, addE, addF, add, total, billed,
     balance: total - billed,
     exec: total > 0 ? billed / total : 0,
   };
 }
 
 // ============= DASHBOARD EXECUTIVO =============
-function buildDashboardSheet(enriched, contracts, billings) {
-  const ws = {};
-  const COLS = 8; // A..H
+function buildDashboardSheet(workbook, enriched, contracts, billings) {
+  const ws = workbook.addWorksheet("Dashboard Executivo", {
+    views: [{ showGridLines: false }],
+  });
+  const lastCol = "H";
 
   const totalInitial = enriched.reduce((s, e) => s + e.initial, 0);
   const totalAdd = enriched.reduce((s, e) => s + e.add, 0);
@@ -124,255 +136,244 @@ function buildDashboardSheet(enriched, contracts, billings) {
   const activeCount = contracts.filter((c) => c.status === "active").length;
   const today = new Date().toLocaleDateString("pt-BR");
 
-  // ----- Logo / Marca (linhas 1-2) -----
-  addBrandBand(ws, "H");
+  addBrand(workbook, ws, lastCol);
 
-  // ----- Título (linha 4) -----
-  merge(ws, "A4:H4");
-  setCell(ws, A(3, 0), "RELATÓRIO DE BACKLOG — CONTRATOS", {
-    fill: C.navy, color: C.white, bold: true, sz: 16, halign: "center", valign: "center", noborder: true,
+  // Título (linha 4-5)
+  ws.mergeCells("A4:H4");
+  put(ws, "A4", "RELATÓRIO DE BACKLOG — CONTRATOS", {
+    fill: C.navy, color: C.white, bold: true, size: 16, halign: "center", noborder: true,
   });
-  merge(ws, "A5:H5");
-  setCell(ws, A(4, 0), `Gerado em ${today}`, {
-    fill: C.navySoft, color: C.white, italic: true, sz: 10, halign: "center", noborder: true,
+  ws.getRow(4).height = 30;
+  ws.mergeCells("A5:H5");
+  put(ws, "A5", `Gerado em ${today}`, {
+    fill: C.navySoft, color: C.white, italic: true, size: 10, halign: "center", noborder: true,
   });
+  ws.getRow(5).height = 20;
+  ws.getRow(6).height = 6;
 
-  // ----- KPIs (linha 7 labels, linha 8 valores) -----
-  merge(ws, "A7:H7");
-  setCell(ws, A(6, 0), "INDICADORES PRINCIPAIS", {
-    fill: C.orange, color: C.white, bold: true, sz: 11, halign: "left",
-  });
+  // KPIs (linhas 7-9)
+  ws.mergeCells("A7:H7");
+  put(ws, "A7", "INDICADORES PRINCIPAIS", { fill: C.orange, color: C.white, bold: true, size: 11 });
+  ws.getRow(7).height = 18;
 
   const kpis = [
-    { span: "A8:B8", vspan: "A9:B9", label: "Contratos Ativos", value: activeCount, fmt: FMT_INT },
-    { span: "C8:D8", vspan: "C9:D9", label: "Valor Contratado", value: totalContracted, fmt: FMT_BRL },
-    { span: "E8:F8", vspan: "E9:F9", label: "Total Faturado", value: totalBilled, fmt: FMT_BRL },
-    { span: "G8:H8", vspan: "G9:H9", label: "Saldo Backlog", value: totalBalance, fmt: FMT_BRL },
+    { lab: "A8:B8", val: "A9:B9", label: "Contratos Ativos", value: activeCount, fmt: FMT_INT },
+    { lab: "C8:D8", val: "C9:D9", label: "Valor Contratado", value: totalContracted, fmt: FMT_BRL },
+    { lab: "E8:F8", val: "E9:F9", label: "Total Faturado", value: totalBilled, fmt: FMT_BRL },
+    { lab: "G8:H8", val: "G9:H9", label: "Saldo Backlog", value: totalBalance, fmt: FMT_BRL },
   ];
   kpis.forEach((k) => {
-    merge(ws, k.span);
-    merge(ws, k.vspan);
-    const [labelAddr] = k.span.split(":");
-    const [valAddr] = k.vspan.split(":");
-    setCell(ws, labelAddr, k.label, {
-      fill: C.graySoft, color: C.muted, bold: true, sz: 9, halign: "center",
-    });
-    setCell(ws, valAddr, k.value, {
-      fill: C.white, color: C.text, bold: true, sz: 14, halign: "center", t: "n", z: k.fmt,
-    });
+    ws.mergeCells(k.lab);
+    ws.mergeCells(k.val);
+    const labAddr = k.lab.split(":")[0];
+    const valAddr = k.val.split(":")[0];
+    put(ws, labAddr, k.label, { fill: C.graySoft, color: C.muted, bold: true, size: 9, halign: "center" });
+    put(ws, valAddr, k.value, { fill: C.white, color: C.text, bold: true, size: 14, halign: "center", numFmt: k.fmt });
   });
+  ws.getRow(8).height = 16;
+  ws.getRow(9).height = 28;
 
-  // ----- Linha de KPIs secundários (%.Execução) -----
-  merge(ws, "A11:H11");
-  setCell(ws, A(10, 0), "% DE EXECUÇÃO", {
-    fill: C.orangeSoft, color: C.text, bold: true, sz: 10, halign: "left",
-  });
-  merge(ws, "A12:D12");
-  setCell(ws, A(11, 0), "Faturado / Contratado", {
-    fill: C.white, color: C.muted, sz: 9, halign: "right", bold: true,
-  });
-  merge(ws, "E12:H12");
-  setCell(ws, A(11, 4), pctExec, {
+  ws.getRow(10).height = 6;
+  // % Execução (11-12)
+  ws.mergeCells("A11:H11");
+  put(ws, "A11", "% DE EXECUÇÃO", { fill: C.orangeSoft, color: C.text, bold: true, size: 10 });
+  ws.getRow(11).height = 18;
+  ws.mergeCells("A12:D12");
+  put(ws, "A12", "Faturado / Contratado", { fill: C.white, color: C.muted, size: 9, halign: "right", bold: true });
+  ws.mergeCells("E12:H12");
+  put(ws, "E12", pctExec, {
     fill: pctExec >= 0.5 ? C.greenSoft : C.orangeSoft,
     color: pctExec >= 0.5 ? C.green : C.orange,
-    bold: true, sz: 16, halign: "center", t: "n", z: FMT_PCT,
+    bold: true, size: 16, halign: "center", numFmt: FMT_PCT,
   });
+  ws.getRow(12).height = 24;
 
-  // ----- TOP 5 CONTRATOS -----
-  let r = 13;
-  merge(ws, `A${r + 1}:H${r + 1}`);
-  setCell(ws, A(r, 0), "TOP 5 CONTRATOS POR VALOR CONTRATADO", {
-    fill: C.navy, color: C.white, bold: true, sz: 11, halign: "left",
-  });
+  // ---- TOP 5 ----
+  let r = 13; // linha do título
+  ws.mergeCells(`A${r}:H${r}`);
+  put(ws, `A${r}`, "TOP 5 CONTRATOS POR VALOR CONTRATADO", { fill: C.navy, color: C.white, bold: true, size: 11 });
   r += 1;
   const topHeaders = ["Projeto", "Cliente", "Contratado", "Aditivos", "Faturado", "Saldo", "% Exec.", "Status"];
-  topHeaders.forEach((h, i) =>
-    setCell(ws, A(r, i), h, {
-      fill: C.navySoft, color: C.white, bold: true, sz: 9, halign: i >= 2 && i <= 5 ? "right" : "left",
-    })
-  );
+  topHeaders.forEach((h, i) => {
+    const col = String.fromCharCode(65 + i);
+    put(ws, `${col}${r}`, h, {
+      fill: C.navySoft, color: C.white, bold: true, size: 9,
+      halign: i >= 2 && i <= 5 ? "right" : "left",
+    });
+  });
   r += 1;
   const top5 = [...enriched].sort((a, b) => b.total - a.total).slice(0, 5);
   top5.forEach((e, idx) => {
     const zebra = idx % 2 ? C.graySoft : C.white;
-    setCell(ws, A(r, 0), e.c.project, { fill: zebra, sz: 9, bold: true });
-    setCell(ws, A(r, 1), e.c.client, { fill: zebra, sz: 9 });
-    setCell(ws, A(r, 2), e.total, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_BRL });
-    setCell(ws, A(r, 3), e.add, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_BRL });
-    setCell(ws, A(r, 4), e.billed, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_BRL });
-    setCell(ws, A(r, 5), e.balance, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_BRL, color: e.balance < 0 ? C.red : C.text });
-    setCell(ws, A(r, 6), e.exec, { fill: zebra, sz: 9, halign: "center", t: "n", z: FMT_PCT });
+    put(ws, `A${r}`, e.c.project, { fill: zebra, size: 9, bold: true });
+    put(ws, `B${r}`, e.c.client, { fill: zebra, size: 9 });
+    put(ws, `C${r}`, e.total, { fill: zebra, size: 9, halign: "right", numFmt: FMT_BRL });
+    put(ws, `D${r}`, e.add, { fill: zebra, size: 9, halign: "right", numFmt: FMT_BRL });
+    put(ws, `E${r}`, e.billed, { fill: zebra, size: 9, halign: "right", numFmt: FMT_BRL });
+    put(ws, `F${r}`, e.balance, { fill: zebra, size: 9, halign: "right", numFmt: FMT_BRL, color: e.balance < 0 ? C.red : C.text });
+    put(ws, `G${r}`, e.exec, { fill: zebra, size: 9, halign: "center", numFmt: FMT_PCT });
     const sc = STATUS_COLOR[e.c.status] || {};
-    setCell(ws, A(r, 7), STATUS_LABEL[e.c.status] || e.c.status, {
-      fill: sc.fill, color: sc.color, sz: 9, halign: "center", bold: true,
+    put(ws, `H${r}`, STATUS_LABEL[e.c.status] || e.c.status, {
+      fill: sc.fill, color: sc.color, size: 9, halign: "center", bold: true,
     });
     r += 1;
   });
-  // total row
-  setCell(ws, A(r, 0), "TOTAL TOP 5", { fill: C.orange, color: C.white, bold: true, sz: 10, halign: "left" });
-  setCell(ws, A(r, 1), "", { fill: C.orange, noborder: true });
-  for (let i = 2; i <= 5; i++) {
-    const v = top5.reduce((s, e) => s + [e.total, e.add, e.billed, e.balance][i - 2], 0);
-    setCell(ws, A(r, i), v, { fill: C.orange, color: C.white, bold: true, sz: 10, halign: "right", t: "n", z: FMT_BRL });
-  }
-  setCell(ws, A(r, 6), "", { fill: C.orange, noborder: true });
-  setCell(ws, A(r, 7), "", { fill: C.orange, noborder: true });
+  // total top5
+  const sums = [2, 3, 4, 5].map((idx) => top5.reduce((s, e) => s + [e.total, e.add, e.billed, e.balance][idx - 2], 0));
+  put(ws, `A${r}`, "TOTAL TOP 5", { fill: C.orange, color: C.white, bold: true, size: 10 });
+  put(ws, `B${r}`, null, { fill: C.orange, noborder: true });
+  ["C", "D", "E", "F"].forEach((col, i) =>
+    put(ws, `${col}${r}`, sums[i], { fill: C.orange, color: C.white, bold: true, size: 10, halign: "right", numFmt: FMT_BRL })
+  );
+  put(ws, `G${r}`, null, { fill: C.orange, noborder: true });
+  put(ws, `H${r}`, null, { fill: C.orange, noborder: true });
 
-  // ----- FATURAMENTO MENSAL -----
+  // ---- Faturamento mensal ----
   r += 2;
-  merge(ws, `A${r + 1}:H${r + 1}`);
-  setCell(ws, A(r, 0), "FATURAMENTO MENSAL (ÚLTIMOS 12 MESES)", {
-    fill: C.navy, color: C.white, bold: true, sz: 11, halign: "left",
-  });
+  ws.mergeCells(`A${r}:H${r}`);
+  put(ws, `A${r}`, "FATURAMENTO MENSAL (ÚLTIMOS 12 MESES)", { fill: C.navy, color: C.white, bold: true, size: 11 });
   r += 1;
-  setCell(ws, A(r, 0), "Mês", { fill: C.navySoft, color: C.white, bold: true, sz: 9 });
-  merge(ws, `B${r + 1}:E${r + 1}`);
-  setCell(ws, A(r, 1), "Faturado (R$)", { fill: C.navySoft, color: C.white, bold: true, sz: 9, halign: "right" });
-  setCell(ws, A(r, 4), "", { fill: C.navySoft, noborder: true });
-  merge(ws, `F${r + 1}:G${r + 1}`);
-  setCell(ws, A(r, 5), "% do Total", { fill: C.navySoft, color: C.white, bold: true, sz: 9, halign: "center" });
-  setCell(ws, A(r, 6), "", { fill: C.navySoft, noborder: true });
-  setCell(ws, A(r, 7), "Acumulado", { fill: C.navySoft, color: C.white, bold: true, sz: 9, halign: "right" });
+  put(ws, `A${r}`, "Mês", { fill: C.navySoft, color: C.white, bold: true, size: 9 });
+  ws.mergeCells(`B${r}:E${r}`);
+  put(ws, `B${r}`, "Faturado (R$)", { fill: C.navySoft, color: C.white, bold: true, size: 9, halign: "right" });
+  ["C", "D", "E"].forEach((col) => put(ws, `${col}${r}`, null, { fill: C.navySoft, noborder: true }));
+  ws.mergeCells(`F${r}:G${r}`);
+  put(ws, `F${r}`, "% do Total", { fill: C.navySoft, color: C.white, bold: true, size: 9, halign: "center" });
+  put(ws, `G${r}`, null, { fill: C.navySoft, noborder: true });
+  put(ws, `H${r}`, "Acumulado", { fill: C.navySoft, color: C.white, bold: true, size: 9, halign: "right" });
   r += 1;
 
   const byMonth = {};
   billings.forEach((b) => { if (b.month) byMonth[b.month] = (byMonth[b.month] || 0) + (b.value || 0); });
-  const sortedMonths = Object.keys(byMonth).sort();
-  const last12 = sortedMonths.slice(-12);
+  const last12 = Object.keys(byMonth).sort().slice(-12);
   const grandTotal = last12.reduce((s, m) => s + byMonth[m], 0);
   let acc = 0;
   last12.forEach((m, idx) => {
     const zebra = idx % 2 ? C.graySoft : C.white;
     const v = byMonth[m];
     acc += v;
-    setCell(ws, A(r, 0), fmtMonth(m), { fill: zebra, sz: 9, bold: true });
-    merge(ws, `B${r + 1}:E${r + 1}`);
-    setCell(ws, A(r, 1), v, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_BRL });
-    setCell(ws, A(r, 2), "", { fill: zebra, noborder: true });
-    setCell(ws, A(r, 3), "", { fill: zebra, noborder: true });
-    setCell(ws, A(r, 4), "", { fill: zebra, noborder: true });
-    merge(ws, `F${r + 1}:G${r + 1}`);
-    setCell(ws, A(r, 5), grandTotal > 0 ? v / grandTotal : 0, { fill: zebra, sz: 9, halign: "center", t: "n", z: FMT_PCT });
-    setCell(ws, A(r, 6), "", { fill: zebra, noborder: true });
-    setCell(ws, A(r, 7), acc, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_BRL });
+    put(ws, `A${r}`, fmtMonth(m), { fill: zebra, size: 9, bold: true });
+    ws.mergeCells(`B${r}:E${r}`);
+    put(ws, `B${r}`, v, { fill: zebra, size: 9, halign: "right", numFmt: FMT_BRL });
+    ["C", "D", "E"].forEach((col) => put(ws, `${col}${r}`, null, { fill: zebra, noborder: true }));
+    ws.mergeCells(`F${r}:G${r}`);
+    put(ws, `F${r}`, grandTotal > 0 ? v / grandTotal : 0, { fill: zebra, size: 9, halign: "center", numFmt: FMT_PCT });
+    put(ws, `G${r}`, null, { fill: zebra, noborder: true });
+    put(ws, `H${r}`, acc, { fill: zebra, size: 9, halign: "right", numFmt: FMT_BRL });
     r += 1;
   });
-  // total
-  setCell(ws, A(r, 0), "TOTAL", { fill: C.orange, color: C.white, bold: true, sz: 10 });
-  merge(ws, `B${r + 1}:E${r + 1}`);
-  setCell(ws, A(r, 1), grandTotal, { fill: C.orange, color: C.white, bold: true, sz: 10, halign: "right", t: "n", z: FMT_BRL });
-  for (let i = 2; i <= 4; i++) setCell(ws, A(r, i), "", { fill: C.orange, noborder: true });
-  merge(ws, `F${r + 1}:G${r + 1}`);
-  setCell(ws, A(r, 5), 1, { fill: C.orange, color: C.white, bold: true, sz: 10, halign: "center", t: "n", z: FMT_PCT });
-  setCell(ws, A(r, 6), "", { fill: C.orange, noborder: true });
-  setCell(ws, A(r, 7), acc, { fill: C.orange, color: C.white, bold: true, sz: 10, halign: "right", t: "n", z: FMT_BRL });
+  put(ws, `A${r}`, "TOTAL", { fill: C.orange, color: C.white, bold: true, size: 10 });
+  ws.mergeCells(`B${r}:E${r}`);
+  put(ws, `B${r}`, grandTotal, { fill: C.orange, color: C.white, bold: true, size: 10, halign: "right", numFmt: FMT_BRL });
+  ["C", "D", "E"].forEach((col) => put(ws, `${col}${r}`, null, { fill: C.orange, noborder: true }));
+  ws.mergeCells(`F${r}:G${r}`);
+  put(ws, `F${r}`, 1, { fill: C.orange, color: C.white, bold: true, size: 10, halign: "center", numFmt: FMT_PCT });
+  put(ws, `G${r}`, null, { fill: C.orange, noborder: true });
+  put(ws, `H${r}`, acc, { fill: C.orange, color: C.white, bold: true, size: 10, halign: "right", numFmt: FMT_BRL });
 
-  // ----- STATUS DOS CONTRATOS -----
+  // ---- Status ----
   r += 2;
-  merge(ws, `A${r + 1}:H${r + 1}`);
-  setCell(ws, A(r, 0), "DISTRIBUIÇÃO POR STATUS", {
-    fill: C.navy, color: C.white, bold: true, sz: 11, halign: "left",
-  });
+  ws.mergeCells(`A${r}:H${r}`);
+  put(ws, `A${r}`, "DISTRIBUIÇÃO POR STATUS", { fill: C.navy, color: C.white, bold: true, size: 11 });
   r += 1;
-  ["Status", "Contratos", "% do Total"].forEach((h, i) => {
-    if (i === 0) { setCell(ws, A(r, 0), h, { fill: C.navySoft, color: C.white, bold: true, sz: 9 }); merge(ws, `A${r + 1}:E${r + 1}`); }
-    if (i === 1) { setCell(ws, A(r, 5), h, { fill: C.navySoft, color: C.white, bold: true, sz: 9, halign: "center" }); merge(ws, `F${r + 1}:G${r + 1}`); }
-    if (i === 2) { setCell(ws, A(r, 7), h, { fill: C.navySoft, color: C.white, bold: true, sz: 9, halign: "right" }); }
-  });
+  ws.mergeCells(`A${r}:E${r}`);
+  put(ws, `A${r}`, "Status", { fill: C.navySoft, color: C.white, bold: true, size: 9 });
+  ["B", "C", "D", "E"].forEach((col) => put(ws, `${col}${r}`, null, { fill: C.navySoft, noborder: true }));
+  ws.mergeCells(`F${r}:G${r}`);
+  put(ws, `F${r}`, "Contratos", { fill: C.navySoft, color: C.white, bold: true, size: 9, halign: "center" });
+  put(ws, `G${r}`, null, { fill: C.navySoft, noborder: true });
+  put(ws, `H${r}`, "% do Total", { fill: C.navySoft, color: C.white, bold: true, size: 9, halign: "right" });
   r += 1;
-  const statuses = ["active", "completed", "cancelled"];
-  statuses.forEach((st, idx) => {
+  ["active", "completed", "cancelled"].forEach((st, idx) => {
     const zebra = idx % 2 ? C.graySoft : C.white;
     const cnt = contracts.filter((c) => c.status === st).length;
     const pct = contracts.length > 0 ? cnt / contracts.length : 0;
     const sc = STATUS_COLOR[st] || {};
-    merge(ws, `A${r + 1}:E${r + 1}`);
-    setCell(ws, A(r, 0), STATUS_LABEL[st] || st, { fill: zebra, sz: 9, bold: true, color: sc.color });
-    merge(ws, `F${r + 1}:G${r + 1}`);
-    setCell(ws, A(r, 5), cnt, { fill: zebra, sz: 9, halign: "center", t: "n", z: FMT_INT });
-    setCell(ws, A(r, 7), pct, { fill: zebra, sz: 9, halign: "right", t: "n", z: FMT_PCT });
+    ws.mergeCells(`A${r}:E${r}`);
+    put(ws, `A${r}`, STATUS_LABEL[st] || st, { fill: zebra, size: 9, bold: true, color: sc.color });
+    ["B", "C", "D", "E"].forEach((col) => put(ws, `${col}${r}`, null, { fill: zebra, noborder: true }));
+    ws.mergeCells(`F${r}:G${r}`);
+    put(ws, `F${r}`, cnt, { fill: zebra, size: 9, halign: "center", numFmt: FMT_INT });
+    put(ws, `G${r}`, null, { fill: zebra, noborder: true });
+    put(ws, `H${r}`, pct, { fill: zebra, size: 9, halign: "right", numFmt: FMT_PCT });
     r += 1;
   });
 
-  // Larguras e alturas
-  ws["!cols"] = [22, 24, 18, 16, 16, 14, 12, 16].map((w) => ({ wch: w }));
-  ws["!rows"] = [
-    { hpt: 20 }, { hpt: 18 }, { hpt: 6 },   // marca + espaçador
-    { hpt: 30 }, { hpt: 20 },               // título + subtítulo
-    { hpt: 6 },                              // espaçador
-    { hpt: 18 }, { hpt: 16 }, { hpt: 28 },  // cabeçalho KPI + rótulo + valor
-    {},                                      // espaçador
-    { hpt: 18 }, { hpt: 22 },               // cabeçalho % exec + linha
+  // Colunas
+  ws.columns = [
+    { width: 22 }, { width: 24 }, { width: 18 }, { width: 16 },
+    { width: 16 }, { width: 16 }, { width: 12 }, { width: 16 },
   ];
-
-  // Range obrigatório: sheets montados manualmente não derivam !ref, sem isso o Excel mostra a aba vazia
-  ws["!ref"] = `A1:H${r}`;
 
   return ws;
 }
 
 // ============= SHEETS DE DADOS =============
-function styleDataSheet(headers, rows, numCols, moneyCols, dateCols = [], pctCols = []) {
-  // Marca nas linhas 1-2 + espaçador na 3; cabeçalho na linha 4, dados a seguir
-  const ws = XLSX.utils.aoa_to_sheet([[""], [""], [""], headers, ...rows]);
-  const range = XLSX.utils.decode_range(ws["!ref"]);
-  const lastColLetter = XLSX.utils.encode_cell({ r: 0, c: headers.length - 1 }).replace(/\d+/, "");
+function buildDataSheet(workbook, name, headers, rows, { moneyCols = [], intCols = [], dateCols = [], pctCols = [], colWidths = [] } = {}) {
+  const ws = workbook.addWorksheet(name, { views: [{ showGridLines: false }] });
+  const lastColLetter = String.fromCharCode(65 + headers.length - 1);
 
-  addBrandBand(ws, lastColLetter);
+  addBrand(workbook, ws, lastColLetter);
 
-  // Cabeçalho (índice 3)
-  for (let c = range.s.c; c <= range.e.c; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 3, c });
-    if (ws[addr]) {
-      ws[addr].s = {
-        font: { name: "Calibri", sz: 10, bold: true, color: { rgb: C.white } },
-        fill: { patternType: "solid", fgColor: { rgb: C.navy } },
-        alignment: { vertical: "center", horizontal: numCols.includes(c) ? "right" : "left", wrapText: true },
-        border: BORDER,
-      };
-      ws[addr].z = undefined;
-    }
-  }
+  // Cabeçalho na linha 4
+  const headerRow = 4;
+  headers.forEach((h, i) => {
+    const col = String.fromCharCode(65 + i);
+    const isNum = moneyCols.includes(i) || intCols.includes(i) || pctCols.includes(i);
+    put(ws, `${col}${headerRow}`, h, {
+      fill: C.navy, color: C.white, bold: true, size: 10,
+      halign: isNum ? "right" : "left", wrap: true,
+    });
+  });
+  ws.getRow(headerRow).height = 22;
 
-  // Corpo (a partir do índice 4)
-  for (let r = 4; r <= range.e.r; r++) {
-    const zebra = (r - 4) % 2 ? C.graySoft : C.white;
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
+  // Corpo a partir da linha 5
+  rows.forEach((row, rIdx) => {
+    const r = headerRow + 1 + rIdx;
+    const zebra = rIdx % 2 ? C.graySoft : C.white;
+    row.forEach((val, c) => {
+      const col = String.fromCharCode(65 + c);
       const isMoney = moneyCols.includes(c);
-      const isNum = numCols.includes(c);
+      const isInt = intCols.includes(c);
       const isDate = dateCols.includes(c);
       const isPct = pctCols.includes(c);
-      ws[addr].s = {
-        font: { name: "Calibri", sz: 10, color: { rgb: C.text } },
-        fill: { patternType: "solid", fgColor: { rgb: zebra } },
-        alignment: {
-          vertical: "center",
-          horizontal: isMoney || isNum || isPct ? "right" : "left",
-        },
-        border: BORDER,
-      };
-      if (isMoney) ws[addr].z = FMT_BRL;
-      if (isNum && !isMoney) ws[addr].z = FMT_INT;
-      if (isPct) ws[addr].z = FMT_PCT;
-      if (isDate) ws[addr].z = "dd/mm/yyyy";
-    }
+      const isNum = isMoney || isInt || isPct;
+      // Converte datas ISO (YYYY-MM-DD) para Date para formatação correta
+      let cellVal = val;
+      if (isDate && val) {
+        const d = new Date(val + (val.length === 10 ? "T00:00:00" : ""));
+        if (!isNaN(d)) cellVal = d;
+      }
+      put(ws, `${col}${r}`, cellVal ?? "", {
+        fill: zebra,
+        halign: isNum ? "right" : "left",
+        numFmt: isMoney ? FMT_BRL : isInt ? FMT_INT : isPct ? FMT_PCT : isDate ? FMT_DATE : undefined,
+      });
+    });
+  });
+
+  if (colWidths.length) {
+    ws.columns = colWidths.map((w) => ({ width: w }));
   }
 
-  ws["!rows"] = [{ hpt: 20 }, { hpt: 18 }, { hpt: 6 }, { hpt: 22 }];
   return ws;
 }
 
-export function exportBacklogToExcel(contracts, additives, billings) {
-  const wb = XLSX.utils.book_new();
+// ============= EXPORT PRINCIPAL =============
+export async function exportBacklogToExcel(contracts, additives, billings) {
+  // Pré-carrega a logo antes de criar o workbook (addImage exige o buffer pronto)
+  _brandBuffer = await getBrandImageBuffer();
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Retrofit Engenharia — Backlog";
+  workbook.created = new Date();
+
   const enriched = contracts.map((c) => enrichContract(c, additives, billings));
 
-  // ===== Sheet 1: Dashboard Executivo =====
-  const wsDash = buildDashboardSheet(enriched, contracts, billings);
-  XLSX.utils.book_append_sheet(wb, wsDash, "Dashboard Executivo");
+  // Sheet 1: Dashboard
+  buildDashboardSheet(workbook, enriched, contracts, billings);
 
-  // ===== Sheet 2: Resumo Backlog =====
+  // Sheet 2: Resumo Backlog
   const resumoHeaders = [
     "Projeto", "Cliente", "Contrato Empresa", "Contrato FD", "Contrato Total",
     "Aditivos Empresa", "Aditivos FD", "Aditivos Total", "Valor Total Contrato",
@@ -381,22 +382,17 @@ export function exportBacklogToExcel(contracts, additives, billings) {
   const resumoRows = enriched.map((e) => [
     e.c.project, e.c.client, e.initialE, e.initialF, e.initial,
     e.addE, e.addF, e.add, e.total,
-    e.billed, // simplificação: total billed (não separamos por tipo neste resumo)
-    0, e.billed, e.balance, e.exec,
+    e.billed, 0, e.billed, e.balance, e.exec,
     STATUS_LABEL[e.c.status] || e.c.status, e.c.start_date || "",
   ]);
-  const wsResumo = styleDataSheet(
-    resumoHeaders, resumoRows,
-    [], [2, 3, 4, 5, 6, 7, 8, 10, 11, 12], [15], [13]
-  );
-  wsResumo["!cols"] = [
-    { wch: 28 }, { wch: 28 }, { wch: 18 }, { wch: 14 }, { wch: 18 },
-    { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 22 },
-    { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-  ];
-  XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo Backlog");
+  buildDataSheet(workbook, "Resumo Backlog", resumoHeaders, resumoRows, {
+    moneyCols: [2, 3, 4, 5, 6, 7, 8, 10, 11, 12],
+    pctCols: [13],
+    dateCols: [15],
+    colWidths: [28, 28, 18, 14, 18, 18, 14, 18, 22, 18, 14, 18, 18, 12, 12, 12],
+  });
 
-  // ===== Sheet 3: Aditivos =====
+  // Sheet 3: Aditivos
   const addHeaders = ["Projeto", "Cliente", "Descrição", "Valor Empresa", "Valor FD", "Total", "Data"];
   const addRows = additives.map((a) => {
     const contract = contracts.find((c) => c.id === a.contract_id);
@@ -406,11 +402,13 @@ export function exportBacklogToExcel(contracts, additives, billings) {
       (a.value_empresa || 0) + (a.value_fd || 0), a.date || "",
     ];
   });
-  const wsAdd = styleDataSheet(addHeaders, addRows, [], [3, 4, 5], [6]);
-  wsAdd["!cols"] = [{ wch: 28 }, { wch: 28 }, { wch: 35 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
-  XLSX.utils.book_append_sheet(wb, wsAdd, "Aditivos");
+  buildDataSheet(workbook, "Aditivos", addHeaders, addRows, {
+    moneyCols: [3, 4, 5],
+    dateCols: [6],
+    colWidths: [28, 28, 35, 16, 12, 14, 12],
+  });
 
-  // ===== Sheet 4: Faturamento =====
+  // Sheet 4: Faturamento
   const billHeaders = ["Projeto", "Cliente", "Mês Ref.", "Mês (Legível)", "Tipo", "Descrição", "Valor", "Data"];
   const billRows = [...billings]
     .sort((a, b) => (a.month || "").localeCompare(b.month || ""))
@@ -423,10 +421,16 @@ export function exportBacklogToExcel(contracts, additives, billings) {
         b.value || 0, b.date || "",
       ];
     });
-  const wsBill = styleDataSheet(billHeaders, billRows, [], [6], [7]);
-  wsBill["!cols"] = [{ wch: 28 }, { wch: 28 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 30 }, { wch: 16 }, { wch: 12 }];
-  XLSX.utils.book_append_sheet(wb, wsBill, "Faturamento");
+  buildDataSheet(workbook, "Faturamento", billHeaders, billRows, {
+    moneyCols: [6],
+    dateCols: [7],
+    colWidths: [28, 28, 12, 14, 10, 30, 16, 12],
+  });
 
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   const dateStr = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `relatorio_backlog_${dateStr}.xlsx`);
+  saveAs(blob, `relatorio_backlog_${dateStr}.xlsx`);
 }
