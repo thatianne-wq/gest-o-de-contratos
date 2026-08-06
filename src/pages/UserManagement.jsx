@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, User, Check, ChevronDown, ChevronUp, Search, Eye, Pencil, Users, Layers, Plus, Trash2, Power, PowerOff } from "lucide-react";
+import { Shield, User, Check, ChevronDown, ChevronUp, Search, Eye, Pencil, Users, Layers, Plus, Trash2, Power, PowerOff, Mail } from "lucide-react";
 import ProfileManager from "@/components/users/ProfileManager";
 
 export default function UserManagement() {
@@ -85,6 +85,12 @@ export default function UserManagement() {
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.UserAccess.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["useraccesses"] }),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: (email) => base44.users.inviteUser(email, "user"),
+    onSuccess: () => alert("Convite enviado! O usuário receberá um email para acessar o app."),
+    onError: (err) => alert("Erro ao enviar convite: " + (err?.message || "tente novamente")),
   });
 
   const handleAddUser = () => {
@@ -222,6 +228,14 @@ export default function UserManagement() {
                           }`}
                         >
                           {isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                        </button>
+                        <button
+                          title="Reenviar convite (liberar acesso ao app)"
+                          onClick={() => inviteMutation.mutate(access.user_email)}
+                          disabled={inviteMutation.isPending && inviteMutation.variables === access.user_email}
+                          className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Mail className="w-4 h-4" />
                         </button>
                         <button
                           title="Excluir usuário"
