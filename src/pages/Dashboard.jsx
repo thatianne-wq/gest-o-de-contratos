@@ -78,8 +78,10 @@ export default function Dashboard() {
   const filteredAdditives = additives.filter((a) =>
     filteredContracts.some((c) => c.id === a.contract_id)
   );
-  const filteredBillings = billings.filter((b) =>
-    filteredContracts.some((c) => c.id === b.contract_id)
+  const filteredBillings = billings.filter(
+    (b) =>
+      filteredContracts.some((c) => c.id === b.contract_id) &&
+      (yearFilter === "all" || (b.month || "").startsWith(yearFilter))
   );
 
   const activeContracts = filteredContracts.filter((c) => c.status === "active");
