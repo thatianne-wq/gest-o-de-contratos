@@ -211,8 +211,8 @@ export default function Dashboard() {
       </div>
 
       <DashboardCharts
-        billings={billings}
-        allContracts={allowedContracts}
+        billings={filteredBillings}
+        allContracts={filteredContracts}
         filterProject={filterProject}
         onFilterProject={setFilterProject}
       />
