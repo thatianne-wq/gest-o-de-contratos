@@ -20,6 +20,8 @@ import {
 
 export default function Dashboard() {
   const [filterProject, setFilterProject] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | active | inactive
+  const [yearFilter, setYearFilter] = useState("all"); // "all" ou "AAAA"
   const [exporting, setExporting] = useState(false);
 
   const { data: contracts = [], isLoading: loadingContracts } = useQuery({
@@ -42,9 +44,36 @@ export default function Dashboard() {
   const isLoading = loadingContracts || loadingAdditives || loadingBillings;
 
   // Filtro por projeto (aplicado sobre contratos permitidos)
-  const filteredContracts = filterProject
+  const projectFilteredContracts = filterProject
     ? allowedContracts.filter((c) => c.id === filterProject)
     : allowedContracts;
+
+  // Filtro por status: Ativos (active) | Inativos (demais) | Todos
+  const statusFilteredContracts = projectFilteredContracts.filter((c) => {
+    if (statusFilter === "active") return c.status === "active";
+    if (statusFilter === "inactive") return c.status !== "active";
+    return true;
+  });
+
+  // Anos disponíveis (a partir dos faturamentos e datas de início dos contratos)
+  const availableYears = Array.from(
+    new Set([
+      ...billings.map((b) => (b.month || "").substring(0, 4)),
+      ...projectFilteredContracts.map((c) => (c.start_date || "").substring(0, 4)),
+    ].filter(Boolean))
+  ).sort((a, b) => b.localeCompare(a));
+
+  // Filtro por ano: contrato visível se tem faturamento ou início naquele ano
+  const filteredContracts =
+    yearFilter !== "all"
+      ? statusFilteredContracts.filter(
+          (c) =>
+            (c.start_date || "").startsWith(yearFilter) ||
+            billings.some(
+              (b) => b.contract_id === c.id && (b.month || "").startsWith(yearFilter)
+            )
+        )
+      : statusFilteredContracts;
 
   const filteredAdditives = additives.filter((a) =>
     filteredContracts.some((c) => c.id === a.contract_id)
@@ -103,6 +132,31 @@ export default function Dashboard() {
               {allowedContracts.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.project}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Filtro por status */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="inactive">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* Filtro por ano */}
+          <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Ano" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {availableYears.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {y}
                 </SelectItem>
               ))}
             </SelectContent>
